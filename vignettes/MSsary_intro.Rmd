@@ -1,0 +1,36 @@
+---
+title: "Introduction to MSsary"
+author: "Thomas Lin Pedersen"
+date: "September 30rd 2014"
+output: 
+    rmarkdown::html_vignette:
+        css: styles.css
+vignette: >
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteIndexEntry{Using MSGFgui}
+  %\usepackage[utf8]{inputenc}
+---
+
+* * *
+
+**emissary**
+[em-*uh*-ser-ee]
+
+noun, plural *emmissaries*
+
+1. a representative sent on a mission or errand:  
+   *emissaries to negotiate a peace.*
+2. an agent sent on a mission of a secret nature, as a spy.
+3. *Anatomy*. sending or coming out, as certain veins that pass through the skull 
+and connect the venous sinuses inside with the veins outside.
+4. pertaining to an emissary.
+
+adjective
+
+5. *Archaic*. sent forth, as on a mission.
+
+*source:* [Dictionary.com](http://dictionary.reference.com/browse/emissary)
+
+*Lets go with the first option*
+
+* * *

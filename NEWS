@@ -1,0 +1,6 @@
+Version 0.0.1
+________________________________________________________________________________
+* First build
+* Definition of MsData and MsConnections classes together with constructor 
+  functions.
+* Initial format for sary file defined
