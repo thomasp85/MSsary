@@ -36,6 +36,9 @@ table, 'data' is a data.frame containing the data to be added.}
 \item{\code{addTable(name, definition)}}{Creates the table 'name' with the columns defined in 'definition'.
 The definition can be a character vector that will be concatenated with ', '.}
 
+\item{\code{getScans(ids)}}{Transparently extract scans, getting modified scans if they exists 
+or read from the raw file if they don't}
+
 \item{\code{raw()}}{Get the mzRramp connection in a safe manner}
 
 \item{\code{sary()}}{Get the sary database connection in a safe manner}

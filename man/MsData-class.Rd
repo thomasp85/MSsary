@@ -2,7 +2,22 @@
 \docType{class}
 \name{MsData-class}
 \alias{MsData-class}
+\alias{editHistory,MsData-method}
+\alias{length,MsData-method}
+\alias{show,MsData-method}
 \title{Main class for interacting with MS data}
+\usage{
+\S4method{show}{MsData}(object)
+
+\S4method{length}{MsData}(x)
+
+\S4method{editHistory}{MsData}(object)
+}
+\arguments{
+\item{object}{An MsData object}
+
+\item{x}{An MsData object}
+}
 \description{
 This class is the main entry point for interacting with MS data in the MSsary
 package. It is designed to seamlessly integrate data from raw data files and
@@ -17,6 +32,14 @@ has a .sary file extension to illustrate its relationship to this package.
 Because it is just an SQLite database file the data generated with MSsary can
 easily be accessed from other programs.
 }
+\section{Methods (by generic)}{
+\itemize{
+\item \code{show}: Short summary of content
+
+\item \code{length}: Number of scans in the raw data
+
+\item \code{editHistory}: Get the edit history of the object
+}}
 \section{Slots}{
 
 \describe{

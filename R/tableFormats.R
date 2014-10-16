@@ -1,7 +1,17 @@
+historyTableFormat <- c(
+    'time               TEXT NOT NULL',
+    'operation          TEXT NOT NULL',
+    'MSsary_version     TEXT NOT NULL',
+    'call               TEXT DEFAULT NULL',
+    'augPackage         TEXT DEFAULT NULL',
+    'augPackVersion     TEXT DEFAULT NULL'
+)
+
 headerTableFormat <- c(
     'seqNum                     INTEGER NOT NULL',
     'acquisitionNum             INTEGER PRIMARY KEY',
     'msLevel                    INTEGER NOT NULL',
+    'polarity                   INTEGER NOT NULL',
     'peaksCount                 INTEGER NOT NULL',
     'totIonCurrent              REAL NOT NULL',
     'retentionTime              REAL NOT NULL',
@@ -22,21 +32,22 @@ headerTableFormat <- c(
 )
 
 scanTableFormat <- c(
-    'scanNum            INTEGER UNIQUE FOREIGN KEY(scanNum) REFERENCES header(acquisitionNum)',
-    'peaksCount         INTEGER NOT NULL',
-    'totIonCurrent      REAL NOT NULL',
-    'basePeakMZ         REAL NOT NULL',
-    'basePeakIntensity  REAL NOT NULL',
-    'lowMZ              REAL NOT NULL',
-    'highMZ             REAL NOT NULL',
+    'scanNum            INTEGER UNIQUE REFERENCES header',
+    'peaksCount         INTEGER',
+    'totIonCurrent      REAL',
+    'retentionTime      REAL',
+    'basePeakMZ         REAL',
+    'basePeakIntensity  REAL',
+    'lowMZ              REAL',
+    'highMZ             REAL',
     'remove             INTEGER NOT NULL CHECK (remove IN (0, 1)) DEFAULT 0',
     'scan               BLOB'
 )
 
 peakTableFormat <- c(
     'peakID     INTEGER PRIMARY KEY',
-    'scanStart  INTEGER FOREIGN KEY(scanStart) REFERENCES header(acquisitionNum)',
-    'scanEnd    INTEGER FOREIGN KEY(scanEnd) REFERENCES header(acquisitionNum)',
+    'scanStart  INTEGER REFERENCES header',
+    'scanEnd    INTEGER REFERENCES header',
     'mzMin      REAL NOT NULL',
     'mzMean     REAL NOT NULL',
     'mzMax      REAL NOT NULL',

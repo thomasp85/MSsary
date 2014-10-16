@@ -1,3 +1,28 @@
+Version 0.0.5
+________________________________________________________________________________
+* Added filtering options for MsData scans method
+* Added XIC functionality to chroms method
+* Added scans method to MsChromList class
+
+Version 0.0.4
+________________________________________________________________________________
+* Added README
+* Begun the vignette
+* Added MsChromList class and base methods
+* Set up package for Rcpp
+* Added getXIC Rcpp function
+
+Version 0.0.3
+________________________________________________________________________________
+* Added MsList virtual class and MsScanList which subclasses it.
+* Added standard functionality to both of the above classes
+
+Version 0.0.2
+________________________________________________________________________________
+* Bug fixes
+* Added documentation
+* Add history table to sary
+
 Version 0.0.1
 ________________________________________________________________________________
 * First build

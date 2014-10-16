@@ -1,5 +1,16 @@
+################################################################################
+# TODO: Add analysis history to sary file - include timestamp and MSsary version
+#
+#       Implement R*tree for storing peaks
+#
+#       Register identification object with specific methods
+#
+
+
 #' @include MsConnections.R
 #' @include tableFormats.R
+#' @include generics.R
+#' @include aaa.R
 #' 
 NULL
 
@@ -33,8 +44,166 @@ setClass(
     'MsData',
     slots=list(
         connections='MsConnections'
-        )
     )
+)
+
+### METHODS
+
+#' @describeIn MsData Short summary of content
+#' 
+#' @param object An MsData object
+#' 
+setMethod(
+    'show', 'MsData',
+    function(object) {
+        cat('An MsData object\n')
+        cat('\n')
+        cat('         Raw file:', basename(con(object)$rawFile), '\n')
+        cat('        Sary file:', basename(con(object)$saryFile), '\n')
+        cat('\n')
+        cat('  Number of scans:', length(object), '\n')
+        cat('\n')
+        cat('Last edit history:\n')
+        cat('\n')
+        print(tail(editHistory(object)[,1:3]))
+    }
+)
+
+#' @describeIn MsData Number of scans in the raw data
+#' 
+#' @param x An MsData object
+#' 
+setMethod(
+    'length', 'MsData',
+    function(x) {
+        con(x)$length()
+    }
+)
+
+#' @describeIn con Get connection from MsData object
+#' 
+setMethod(
+    'con', 'MsData',
+    function(object) {
+        return(object@connections)
+    }
+)
+
+#' @describeIn MsData Get the edit history of the object
+#' 
+setMethod(
+    'editHistory', 'MsData',
+    function(object) {
+        dbGetQuery(con(object)$sary(), 'SELECT * FROM history')
+    }
+)
+
+#' Extract scans from an MsData object
+#' 
+#' This method returns one or several scans based on a range of selection 
+#' criteria. See the arguments section for a full list.
+#' 
+setMethod(
+    'scans', 'MsData',
+    function(object, id, ...) {
+        if(length(list(...)) != 0) {
+            acqNum <- getAcqNum(con(object), ...)
+            if(!missing(id)) {
+                acqNum <- id[id %in% acqNum]
+            }
+        } else {
+            acqNum <- id
+        }
+        if(length(acqNum) == 0) {
+            stop('No scans match criteria')
+        }
+        scInfo <- dbGetQuery(con(object)$sary(), paste0('SELECT * FROM header WHERE acquisitionNum IN (', paste(acqNum, collapse=', '), ')'))
+        scData <- con(object)$getScans(scInfo$acquisitionNum)
+        if(class(scData) == 'matrix') scData <- list(scData)
+        mapping <- getListMapping(scData, 1)
+        mapping <- cbind(mapping, matrix(isCentroided(scData), dimnames = list(NULL, 'mode')))
+        scData <- do.call(rbind, scData)
+        colnames(scData) <- c('mz', 'intensity')
+        new('MsScanList', connections=list(con(object)), info=scInfo, data=scData, mapping=mapping)
+    }
+)
+
+#' Extract chromatograms from an MsData object
+#' 
+#' This function is used to get chromatographic data from an MsData object. If
+#' nothing besides the object is passed the full chromatogram is extracted, but
+#' this can be altered by passing in scan, mz and retention time constraints.
+#' The returned MsScanList object contains both TIC and BPC so there is no need 
+#' to specify this during creation
+#' 
+setMethod(
+    'chroms', 'MsData',
+    function(object, seqNum, retentionTime, mzRange, msLevel = 1) {
+        #browser()
+        if(missing(seqNum)) {
+            if(missing(retentionTime)) {
+                acqNum <- list(getAcqNum(con(object), msLevels = msLevel))
+            } else {
+                if(class(retentionTime) != 'matrix') {
+                    retentionTime <- matrix(retentionTime, ncol=2, byrow=TRUE)
+                }
+                acqNum <- lapply(1:nrow(retentionTime), function(i) {
+                    getAcqNum(con(object), retentionTime=retentionTime[i,], msLevels=msLevel)
+                })
+            }
+        } else {
+            if(!missing(retentionTime)) {
+                warning('retention time window ignored')
+            }
+            if(class(seqNum) != 'matrix') {
+                seqNum <- matrix(seqNum, ncol=2, byrow=TRUE)
+            }
+            acqNum <- lapply(1:nrow(seqNum), function(i) {
+                getAcqNum(con(object), seqNum=seqNum[i,], msLevels=msLevel)
+            })
+        }
+        if(missing(mzRange)) {
+            scanNums <- sort(unique(do.call('c', acqNum)))
+            data <- dbGetQuery(con(object)$sary(), paste0('SELECT acquisitionNum, retentionTime, totIonCurrent, basePeakIntensity FROM header WHERE acquisitionNum IN (', paste(scanNums, collapse=', '), ')'))
+            #browser()
+            data <- lapply(acqNum, function(x) {data[data$acquisitionNum %in% x,]})
+        } else {
+            if(class(mzRange) != 'matrix') {
+                mzRange <- matrix(mzRange, ncol=2, byrow=TRUE)
+            }
+            if(length(acqNum) > nrow(mzRange)) {
+                mzRange <- mzRange[rep(1:nrow(mzRange), length.out=length(acqNum)), ]
+            } else if(length(acqNum) < nrow(mzRange)) {
+                acqNum <- rep(acqNum, length.out=nrow(mzRange))
+            }
+            data <- con(object)$extractIC(acqNum, mzRange)
+        }
+        info <- lapply(1:length(data), function(i) {
+            data.frame(
+                name=NA, 
+                nScan=nrow(data[[i]]), 
+                maxTIC=max(data[[i]]$totIonCurrent), 
+                maxBPC=max(data[[i]]$basePeakIntensity), 
+                minRT=min(data[[i]]$retentionTime), 
+                maxRT=max(data[[i]]$retentionTime)
+            )
+        })
+        info <- do.call(rbind, info)
+        if(!missing(mzRange)) {
+            colnames(mzRange) <- c('minMZ', 'maxMZ')
+            info <- cbind(info, mzRange)
+        }
+        info$name <- createChromNames(object, info)
+        mapping <- getListMapping(data, 1)
+        data <- as.matrix(do.call(rbind, data))
+        cNames <- c('acquisitionNum', 'retentionTime', 'TIC', 'BPC')
+        colnames(data) <- cNames
+        new('MsChromList', connections=list(con(object)), info=info, data=data, mapping=mapping)
+    }
+)
+
+
+### CONSTRUCTORS
 
 #' Create an MsData object from a raw MS data file
 #' 
@@ -74,9 +243,26 @@ createMsData <- function(rawFile) {
     
     connection$addData('header', headerInfo)
     
+    connection$addTable('history', historyTableFormat)
+    funcCall <- sys.call(0)
+    connection$addData(
+        'history', 
+        data.frame(
+            time = as.character(Sys.time()),
+            operation = 'Sary created',
+            MSsary_version = .MSsary_version,
+            call = deparse(funcCall)
+        )
+    )
+    
     connection$addTable('scans', scanTableFormat)
     
     connection$addTable('peaks', peakTableFormat)
+    
+    dbGetQuery(
+        connection$sary(), 
+        'CREATE VIEW currentRawHeader AS SELECT * FROM header WHERE acquisitionNum NOT IN (SELECT scanNum FROM scans WHERE retentionTime IS NULL)'
+    )
     
     new('MsData', connections=connection)
 }
@@ -105,14 +291,14 @@ createMsData <- function(rawFile) {
 #' @export
 #' 
 loadMsData <- function(rawFile, saryFile, testIntegrity=TRUE, testSize=10) {
-    connection <- MsConnections(rawFile, dbFile)
+    connection <- MsConnections(rawFile, saryFile)
     
-    if(!verifySary(connection)) {
+    if(!connection$verify()) {
         stop(saryFile, ' does not look like a saryFile')
     }
     if(testIntegrity) {
         if(!connection$validate(testSize)) {
-            stop(saryFile, ' and ', rawFile, 'does not match')
+            stop(saryFile, ' and ', rawFile, ' does not match')
         }
     }
     new('MsData', connections=connection)

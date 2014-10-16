@@ -67,12 +67,12 @@ MsConnections <- setRefClass(
         verify = function() {
             'Verify that the default tables are present and their structure conforms'
             
-            presentTables <- dbListTables(.self$sary())
+            presentTables <- dbListTables(sary())
             tablesConform <- all(c('header', 'scans', 'peaks') %in% presentTables)
             
-            headerCols <- dbGetQuery(.self$sary(), 'PRAGMA table_info(header)')$name
-            scansCols <- dbGetQuery(.self$sary(), 'PRAGMA table_info(scans)')$name
-            peaksCols <- dbGetQuery(.self$sary(), 'PRAGMA table_info(peaks)')$name
+            headerCols <- dbGetQuery(sary(), 'PRAGMA table_info(header)')$name
+            scansCols <- dbGetQuery(sary(), 'PRAGMA table_info(scans)')$name
+            peaksCols <- dbGetQuery(sary(), 'PRAGMA table_info(peaks)')$name
             
             trueHeaderCols <- sapply(strsplit(headerTableFormat, ' '), function(x) x[1])
             trueScansCols <- sapply(strsplit(scanTableFormat, ' '), function(x) x[1])
@@ -91,14 +91,17 @@ MsConnections <- setRefClass(
         validate = function(subset=10) {
             'Checks that the header data matches between raw and sary'
             
-            saryLength <- dbGetQuery(.self$sary(), 'SELECT Count(*) FROM header')
-            rawLength <- length(.self$ramp())
+            saryLength <- dbGetQuery(sary(), 'SELECT Count(*) FROM header')
+            rawLength <- base::length(raw())
             if(saryLength != rawLength) return(FALSE)
             
             randIndex <- sample(1:rawLength, size = subset, replace = FALSE)
-            randRaw <- header(.self$ramp(), randIndex)
+            randRaw <- header(raw(), randIndex)
+            randRaw <- randRaw[order(randRaw$seqNum),]
+            rownames(randRaw) <- NULL
+            
             randSary <- dbGetQuery(
-                .self$sary(),
+                sary(),
                 paste0(
                     'SELECT * FROM header WHERE seqNum IN (',
                     paste(randIndex, collapse=', '),
@@ -138,7 +141,7 @@ MsConnections <- setRefClass(
             'Creates the table \'name\' with the columns defined in \'definition\'.
             The definition can be a character vector that will be concatenated with \', \'.'
             
-            if(dbExistsTable(.self$sary(), name)) stop('Table already exists')
+            if(dbExistsTable(sary(), name)) stop('Table already exists')
             
             newTable <- paste0(
                 'CREATE Table ', 
@@ -147,24 +150,31 @@ MsConnections <- setRefClass(
                 paste(definition, collapse=', '),
                 ')'
             )
-            dbGetQuery(.self$sary(), newTable)
+            dbGetQuery(sary(), newTable)
         },
         addData = function(name, data) {
             'Adds data to an already created table. \'name\' specifies the name of the
             table, \'data\' is a data.frame containing the data to be added.'
             
-            if(!dbExistsTable(.self$sary(), name)) stop('Table don\'t exists')
+            if(!dbExistsTable(sary(), name)) stop('Table don\'t exists')
             
             tableDef <- dbGetQuery(
-                .self$sary(), 
+                sary(), 
                 paste0('PRAGMA table_info(', name,')')
             )
             nameMatch <- names(data) %in% tableDef$name
             if(any(!nameMatch)) warning(sum(!nameMatch), ' Columns ignored')
             
-            dbBeginTransaction(.self$sary())
+            missingNames <- tableDef$name[!tableDef$name %in% names(data)]
+            if(base::length(missingNames) != 0) {
+                for(i in missingNames) {
+                    data[, i] <- NA
+                }
+            }
+            
+            dbBeginTransaction(sary())
             dbGetPreparedQuery(
-                .self$sary(), 
+                sary(), 
                 paste0(
                     'INSERT INTO ', 
                     name, 
@@ -174,13 +184,51 @@ MsConnections <- setRefClass(
                 ),
                 bind.data=data
             )
-            dbCommit(.self$sary())
+            dbCommit(sary())
+        },
+        getScans = function(ids) {
+            'Transparently extract scans, getting modified scans if they exists 
+            or read from the raw file if they don\'t'
+            
+            seqNum <- dbGetQuery(sary(), paste0('SELECT seqNum, acquisitionNum FROM header WHERE acquisitionNum IN (', paste(ids, collapse=', '), ')'))
+            seqNum <- seqNum[match(ids, seqNum$acquisitionNum), ]
+            p <- peaks(raw(), seqNum$seqNum)
+            if(class(p) == 'matrix') {
+                p <- list(p)
+            }
+            p
+        },
+        setScans = function(ids, retentionTime, scans) {
+            'Set scans to new values and/or change the retention time of the scans'
+        },
+        removeScans = function(ids) {
+            'Remove scans from the set'
+        },
+        resetScan = function(ids) {
+            'Reset the state of scans back to its original value'
+        },
+        extractIC = function(acqNum, mzwin) {
+            scanNum <- sort(unique(do.call('c', acqNum)))
+            scans <- getScans(scanNum)
+            scanInfo <- dbGetQuery(sary(), paste0('SELECT acquisitionNum, retentionTime FROM header WHERE acquisitionNum IN (', paste(scanNum, collapse=', '), ')'))
+            XIC <- list()
+            for(i in 1:base::length(acqNum)) {
+                scIndex <- match(acqNum[[i]], scanNum)
+                scData <- getXIC(scans[scIndex], mzmin=mzwin[i, 1], mzmax=mzwin[i, 2])
+                scData <- cbind(scanInfo[scIndex, ], scData)
+                names(scData)[3:4] <- c('totIonCurrent', 'basePeakIntensity')
+                XIC[[i]] <- scData
+            }
+            XIC
         },
         show = function() {
             cat('An MsConnections object with connection to the following files')
             cat('\n\n')
             cat('MS raw data:  ', rawFile, '\n')
             cat('Sary database:', saryFile, '\n')
+        },
+        length = function() {
+            as.numeric(dbGetQuery(sary(), 'SELECT Count(*) FROM header'))
         }
-        )
     )
+)
