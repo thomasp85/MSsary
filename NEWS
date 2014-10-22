@@ -3,6 +3,7 @@ ________________________________________________________________________________
 * Added filtering options for MsData scans method
 * Added XIC functionality to chroms method
 * Added scans method to MsChromList class
+* Added MsIonList class for handling raw ion measurements in a defined area
 
 Version 0.0.4
 ________________________________________________________________________________
