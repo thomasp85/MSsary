@@ -112,7 +112,7 @@ setGeneric(
 #' Extract chromatograms from an object
 #' 
 #' This function allows the user to extract chromatograms from a range of 
-#' objects intoan MsChromList object
+#' objects into an MsChromList object
 #' 
 #' @param object The object to extract chromatograms from
 #' 
@@ -124,6 +124,23 @@ setGeneric(
 #' 
 setGeneric(
     'chroms', def = function(object, ...) {standardGeneric('chroms')}
+)
+
+#' Extract ions from an object
+#' 
+#' This function allows the user to extract ions from a range of 
+#' objects into an MsIonList object
+#' 
+#' @param object The object to extract ions from
+#' 
+#' @param ... Aditional parameters depending on the class of @@object
+#' 
+#' @return An MsIonList object
+#' 
+#' @export
+#' 
+setGeneric(
+    'ions', def = function(object, ...) {standardGeneric('ions')}
 )
 
 #' Get and set the mode of scans in an MsScanList
