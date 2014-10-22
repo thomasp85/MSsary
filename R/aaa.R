@@ -341,3 +341,35 @@ createChromNames <- function(object, info) {
     }
     name
 }
+
+#' Create profile data from ions
+#' 
+#' This function takes a matrix of ion triples and bins the data to create well
+#' formated data
+#' 
+#' @import dplyr
+#' 
+binIons <- function(ions, fun=max, mzBins=500, rtBins) {
+    rtRange <- range(ions[, 'retentionTime'])
+    mzRange <- range(ions[, 'mz'])
+    rtBins <- ifelse(missing(rtBins), length(unique(ions[, 'retentionTime']))-1, rtBins)
+    binWidthRT <- diff(rtRange)/rtBins
+    binWidthMZ <- diff(mzRange)/mzBins
+    rtBreaks <- seq(rtRange[1]-binWidthRT/2, rtRange[2]+binWidthRT/2, binWidthRT)
+    mzBreaks <- seq(mzRange[1], mzRange[2], binWidthMZ)
+    
+    rtBin <- cut(ions[, 'retentionTime'], rtBreaks, include.lowest=TRUE)
+    mzBin <- cut(ions[, 'mz'], mzBreaks, include.lowest=TRUE)
+    
+    ans <- data.frame(ions, rtBin=rtBin, mzBin=mzBin) %>%
+        group_by(rtBin, mzBin) %>%
+        select(intensity) %>%
+        summarise(intensity=fun(intensity))
+    allComb <- expand.grid(rtBin=levels(rtBin), mzBin=levels(mzBin))
+    ans <- merge(allComb, as.data.frame(ans), all.x=TRUE)
+    data.frame(
+        retentionTime = (rtBreaks[1:rtBins]+binWidthRT/2)[match(ans$rtBin, levels(rtBin))],
+        mz = (mzBreaks[1:mzBins]+binWidthMZ/2)[match(ans$mzBin, levels(mzBin))],
+        intensity = ans$intensity
+    )
+}
