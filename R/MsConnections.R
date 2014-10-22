@@ -221,6 +221,24 @@ MsConnections <- setRefClass(
             }
             XIC
         },
+        extractIons = function(acqNum, mzwin=NULL) {
+            scanNum <- sort(unique(do.call('c', acqNum)))
+            scans <- getScans(scanNum)
+            rt <- dbGetQuery(sary(), paste0('SELECT retentionTime FROM header WHERE acquisitionNum IN (', paste(scanNum, collapse=', '), ')'))
+            ions <- list()
+            for(i in 1:base::length(acqNum)) {
+                scIndex <- match(acqNum[[i]], scanNum)
+                rtCurrent <- rep(rt[scIndex,], sapply(scans[scIndex], nrow))
+                ionData <- cbind(do.call(rbind, scans[scIndex]), rtCurrent)
+                colnames(ionData) <- c('mz', 'intensity', 'retentionTime')
+                if(!is.null(mzwin)){
+                    ionData <- ionData[ionData[, 'mz'] > mzwin[1] & ionData[, 'mz'] < mzwin[2], ]
+                }
+                ionData <- ionData[ionData[, 'intensity'] != 0,]
+                ions[[i]] <- ionData
+            }
+            ions
+        },
         show = function() {
             cat('An MsConnections object with connection to the following files')
             cat('\n\n')
