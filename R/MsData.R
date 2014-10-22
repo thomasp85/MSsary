@@ -181,6 +181,7 @@ setMethod(
         info <- lapply(1:length(data), function(i) {
             data.frame(
                 name=NA, 
+                msLevel=msLevel,
                 nScan=nrow(data[[i]]), 
                 maxTIC=max(data[[i]]$totIonCurrent), 
                 maxBPC=max(data[[i]]$basePeakIntensity), 
@@ -202,6 +203,56 @@ setMethod(
     }
 )
 
+#' Extract ions from an MsData object
+#' 
+setMethod(
+    'ions', 'MsData',
+    function(object, seqNum, retentionTime, mzRange, msLevel = 1, SIMPLIFY=TRUE) {
+        if(missing(seqNum)) {
+            if(missing(retentionTime)) {
+                acqNum <- list(getAcqNum(con(object), msLevels = msLevel))
+            } else {
+                if(class(retentionTime) != 'matrix') {
+                    retentionTime <- matrix(retentionTime, ncol=2, byrow=TRUE)
+                }
+                acqNum <- lapply(1:nrow(retentionTime), function(i) {
+                    getAcqNum(con(object), retentionTime=retentionTime[i,], msLevels=msLevel)
+                })
+            }
+        } else {
+            if(!missing(retentionTime)) {
+                warning('retention time window ignored')
+            }
+            if(class(seqNum) != 'matrix') {
+                seqNum <- matrix(seqNum, ncol=2, byrow=TRUE)
+            }
+            acqNum <- lapply(1:nrow(seqNum), function(i) {
+                getAcqNum(con(object), seqNum=seqNum[i,], msLevels=msLevel)
+            })
+        }
+        if(missing(mzRange)) mzRange <- NULL
+        ions <- con(object)$extractIons(acqNum, mzRange)
+        ions <- lapply(ions, function(x) {
+            new(
+                'MsIonList',
+                connections=list(con(object)),
+                info=data.frame(
+                    msLevel=msLevel,
+                    minRT=min(x[, 'retentionTime']), 
+                    maxRT=max(x[, 'retentionTime']), 
+                    minMZ=min(x[, 'mz']),
+                    maxMZ=max(x[, 'mz']),
+                    minINT=min(x[, 'intensity']),
+                    maxINT=max(x[, 'intensity'])
+                ),
+                data=x,
+                mapping=matrix(c(1, nrow(x), 1), nrow=1, dimnames = list(NULL, c('start', 'end', 'conIndex')))
+            )
+        })
+        if(SIMPLIFY && length(ions) == 1) ions <- ions[[1]]
+        ions
+    }
+)
 
 ### CONSTRUCTORS
 
