@@ -239,6 +239,40 @@ type of data and another type of related data should be easy and natural. If
 ever you need the scans that are related to an object, `scans()` is there to 
 save your day.
 
+### Extracting ions
+While the MsScanList and MsChromList object are fine for working with slices of
+data it is also possible to extract the raw triplets of data (retention-time, mz
+and intensity). These are stored in an MsIonList and are often used to visualy
+instpect an area of your data
+
+```{r, eval=TRUE, echo=TRUE}
+msIons <- ions(msData, retentionTime=c(400, 500), mzRange=c(300, 310))
+msIons
+```
+
+MsIonLists can be investigated using two different plot types:
+
+```{r, eval=TRUE, echo=TRUE}
+msPlot(msIons)
+```
+
+Besides the standard 'synthetic gel' plot a 3D plot is also avaliable for those
+with the rgl package installed. This can be beneficial as subtle colour changes
+can be difficault to discern in a heatmap.
+
+```{r, eval=FALSE}
+msPlot(msIons, '3d')
+```
+![3D ion animation](pics/animIon.gif)
+
+MsIonList object of course also support the same linking as described for 
+MsChromList object, so MsScanList and MsChromList objects can be easily derived
+
+```{r, eval=TRUE, echo=TRUE}
+chroms(msIons)
+scans(msIons)
+```
+
 ## Analysing raw data
 While investigating raw data is an important step in making sure that everything
 is as it should be, MS data is seldom interesting in its raw, unprocessed form.
@@ -279,6 +313,29 @@ To be done
 ### Grouping of peaks across samples
 To be done
 
+## Pipelines
+When using MSsary you might find a certain lack of default values for the 
+different algorithms. This is by design due to the belief that defaults are the
+lazy substitute for getting acquainted with your data. In MSsary defaults are 
+only given in the circumstances where there is a definite norm, and any other 
+value would be a deviation from the norm. To illustrate this let us look at the 
+xcms implementation of the centWave algorithm. It comes with defaults for ppm,
+peakwidth, snthresh and prefilter to name a few. There is nothing in either MS
+data nor the algorithm that specifies that these defaults are meaningfull to the
+vast majority of cases, but their status as defaults indicate just that.
+
+MSsary wants to do away with this and instead require the user to make a 
+conscious decision based on the data at hand. Still it can get tedious to 
+reenter the same values again and again (as some parameters remains the same for
+a certain instrument or setup), so to avoid this MSsary makes it possible to
+create pipelines. Pipelines defines a certain sequence of analyses and makes it 
+possible to supply default values for same or all of the parameters.
+
+### Creating a pipeline
+To be done
+
+### Using a pipeline
+To be done
 
 ## Session
 ```{r, eval=TRUE, echo=TRUE}
