@@ -15,6 +15,6 @@ An MsChromList object
 }
 \description{
 This function allows the user to extract chromatograms from a range of
-objects intoan MsChromList object
+objects into an MsChromList object
 }
 

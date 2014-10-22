@@ -70,7 +70,15 @@ This class is a container for one or several XIC from MsData object(s).
 @data matrix}
 }}
 \seealso{
-Other MSsary-classees: \code{\link{MsPeakList-class}};
+Other MSsary-classees: \code{\link{MsIonList-class}},
+  \code{\link{[,MsIonList,logical,missing,missing-method}},
+  \code{\link{[,MsIonList,numeric,missing,missing-method}},
+  \code{\link{length,MsIonList-method}},
+  \code{\link{msData,MsIonList-method}},
+  \code{\link{msInfo,MsIonList-method}},
+  \code{\link{msPlot,MsIonList-method}},
+  \code{\link{show,MsIonList-method}};
+  \code{\link{MsPeakList-class}};
   \code{\link{MsScanList-class}},
   \code{\link{[,MsScanList,logical,missing,missing-method}},
   \code{\link{[,MsScanList,numeric,missing,missing-method}},

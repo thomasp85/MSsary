@@ -24,7 +24,7 @@
 
 \S4method{scanMode}{MsScanList}(object)
 
-\S4method{msPlot}{MsScanList}(object, ...)
+\S4method{msPlot}{MsScanList}(object, simple = FALSE, ...)
 
 \S4method{nextScan}{MsScanList}(object, sameLevel = TRUE)
 
@@ -109,6 +109,14 @@ Other MSsary-classees: \code{\link{MsChromList-class}},
   \code{\link{msInfo,MsChromList-method}},
   \code{\link{msPlot,MsChromList-method}},
   \code{\link{show,MsChromList-method}};
+  \code{\link{MsIonList-class}},
+  \code{\link{[,MsIonList,logical,missing,missing-method}},
+  \code{\link{[,MsIonList,numeric,missing,missing-method}},
+  \code{\link{length,MsIonList-method}},
+  \code{\link{msData,MsIonList-method}},
+  \code{\link{msInfo,MsIonList-method}},
+  \code{\link{msPlot,MsIonList-method}},
+  \code{\link{show,MsIonList-method}};
   \code{\link{MsPeakList-class}}
 }
 
