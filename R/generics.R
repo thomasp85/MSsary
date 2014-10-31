@@ -280,3 +280,11 @@ setGeneric(
 setGeneric(
     'msData', def = function(object) {standardGeneric('msData')}
 )
+
+#' Detect peaks in chromatographic MS data
+#' 
+#' @export
+#' 
+setGeneric(
+    'detectPeaks', def = function(object, ...) {standardGeneric('detectPeaks')}
+)

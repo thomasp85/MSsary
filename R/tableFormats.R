@@ -8,7 +8,7 @@ historyTableFormat <- c(
 )
 
 headerTableFormat <- c(
-    'seqNum                     INTEGER NOT NULL',
+    'seqNum                     INTEGER NOT NULL UNIQUE',
     'acquisitionNum             INTEGER PRIMARY KEY',
     'msLevel                    INTEGER NOT NULL',
     'polarity                   INTEGER NOT NULL',
@@ -35,7 +35,6 @@ scanTableFormat <- c(
     'scanNum            INTEGER UNIQUE REFERENCES header',
     'peaksCount         INTEGER',
     'totIonCurrent      REAL',
-    'retentionTime      REAL',
     'basePeakMZ         REAL',
     'basePeakIntensity  REAL',
     'lowMZ              REAL',
@@ -46,8 +45,9 @@ scanTableFormat <- c(
 
 peakTableFormat <- c(
     'peakID     INTEGER PRIMARY KEY',
-    'scanStart  INTEGER REFERENCES header',
-    'scanEnd    INTEGER REFERENCES header',
+    'scanStart  INTEGER REFERENCES header(seqNum)',
+    'scanEnd    INTEGER REFERENCES header(seqNum)',
+    'length     INTEGER NOT NULL',
     'mzMin      REAL NOT NULL',
     'mzMean     REAL NOT NULL',
     'mzMax      REAL NOT NULL',

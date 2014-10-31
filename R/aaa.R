@@ -348,11 +348,12 @@ createChromNames <- function(object, info) {
 #' formated data
 #' 
 #' @import dplyr
+#' @importFrom reshape2 acast melt
 #' 
-binIons <- function(ions, fun=max, mzBins=500, rtBins) {
+binIons <- function(ions, fun=max, mzBins=500, rtBins=mzBins) {
     rtRange <- range(ions[, 'retentionTime'])
     mzRange <- range(ions[, 'mz'])
-    rtBins <- ifelse(missing(rtBins), length(unique(ions[, 'retentionTime']))-1, rtBins)
+#    rtBins <- ifelse(missing(rtBins), length(unique(ions[, 'retentionTime']))-1, rtBins)
     binWidthRT <- diff(rtRange)/rtBins
     binWidthMZ <- diff(mzRange)/mzBins
     rtBreaks <- seq(rtRange[1]-binWidthRT/2, rtRange[2]+binWidthRT/2, binWidthRT)
@@ -365,11 +366,55 @@ binIons <- function(ions, fun=max, mzBins=500, rtBins) {
         group_by(rtBin, mzBin) %>%
         select(intensity) %>%
         summarise(intensity=fun(intensity))
-    allComb <- expand.grid(rtBin=levels(rtBin), mzBin=levels(mzBin))
-    ans <- merge(allComb, as.data.frame(ans), all.x=TRUE)
+    
+#    allComb <- expand.grid(rtBin=levels(rtBin), mzBin=levels(mzBin))
+#    ans <- merge(allComb, as.data.frame(ans), all.x=TRUE)
+    
+    ans <- acast(ans, mzBin ~ rtBin, fill=NA, value.var='intensity', drop=FALSE)
+    gaps <- findGaps(ans)
+    if(!is.null(gaps)) {
+        for(i in 1:length(gaps)) {
+            gap <- gaps[[i]]
+            bounds <- range(gap) + c(-1, 1)
+            ans[, gap] <- fillGaps(ans[, bounds[1]], ans[, bounds[2]], length(gap))
+        }
+    }
+    ans <- melt(ans, varnames=c('mzBin', 'rtBin'), value.name='intensity')
+    
     data.frame(
         retentionTime = (rtBreaks[1:rtBins]+binWidthRT/2)[match(ans$rtBin, levels(rtBin))],
         mz = (mzBreaks[1:mzBins]+binWidthMZ/2)[match(ans$mzBin, levels(mzBin))],
         intensity = ans$intensity
     )
+}
+
+#' Interpolate gaps between RT bins
+#' 
+fillGaps <- function(from, to, width) {
+    naRows <- which(is.na(from) & is.na(to))
+    from[is.na(from)] <- 0
+    to[is.na(to)] <- 0
+    ans <- t(mapply(seq, from, to, MoreArgs=list(length.out=width+2)))
+    ans <- ans[, -c(1, width+2), drop=FALSE]
+    ans[naRows, ] <- NA
+    ans
+}
+#' Find gaps in RT bins
+#' 
+findGaps <- function(data) {
+    naCols <- apply(data, 2, function(x) all(is.na(x)))
+    if(!any(naCols)) return(NULL)
+    breaks <- c(0, which(diff(which(naCols)) != 1), length(which(naCols)))
+    sapply(seq(length(breaks) - 1), function(i) which(naCols)[(breaks[i] + 1):breaks[i+1]])
+}
+
+#' Create a data.frame with precursor scans
+#' 
+annotateChildren <- function(data, children, mode) {
+    if(mode == 'profile') {
+        data <- data[which(diff(sign(diff(data$intensity)))==-2)+1, ]
+    }
+    diffs <- abs(outer(data$mz, children$precursorMZ, `-`))
+    cInd <- apply(diffs, 2, which.min)
+    data[cInd,]
 }

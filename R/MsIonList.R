@@ -1,3 +1,8 @@
+################################################################################
+# TODO: Should multiple ion sets be handled by one object? how shuld plotting
+#       behave in that case
+#
+
 #' @include aaa.R
 #' @include generics.R
 #' @include MsList.R
@@ -70,21 +75,67 @@ setMethod(
 #' 
 #' @param type Which type of plots should be plotted
 #' 
-#' @import ggplot2
+#' @import ggplot2 gtable grid
 #' @importFrom RColorBrewer brewer.pal
 #' 
 setMethod(
     'msPlot', 'MsIonList',
-    function(object, type='2d', ...) {
+    function(object, type='2d', simple=FALSE, precursors=!simple, ...) {
         data <- data.frame(object@data)
         cScale <- brewer.pal(9, 'YlOrRd')
         if(type == '2d') {
-            data <- binIons(data)
+            data <- binIons(data, ...)
+            data$row <- 2
+            data$col <- 1
             p <- ggplot(data, aes(x=retentionTime, y=mz, fill=intensity)) + theme_bw()
             p <- p + geom_raster()
             p <- p + scale_y_continuous('m/z') + scale_x_continuous('Retention time (sec)')
             p <- p + scale_fill_gradientn('Intensity', colours=cScale, na.value=rgb(0,0,0,0))
-            p
+            if(precursors) {
+                info <- msInfo(object)
+                precursorData <- dbGetQuery(
+                    con(object, 1)$sary(), 
+                    paste0('SELECT prec.mz AS mz, orig.retentionTime AS retentionTime FROM 
+                               (SELECT precursorScanNum, precursorMZ AS mz FROM currentHeader WHERE precursorScanNum IN (SELECT acquisitionNum FROM currentHeader WHERE retentionTime BETWEEN ', info$minRT, ' AND ', info$maxRT, ') AND precursorMZ BETWEEN ', info$minMZ, ' AND ', info$maxMZ, ')
+                           AS prec 
+                           JOIN currentHeader AS orig ON orig.acquisitionNum = prec.precursorScanNum')
+                )
+                if(nrow(precursorData) != 0) {
+                    precursorData$row <- 2
+                    precursorData$col <- 1
+                    p <- p + geom_point(aes(colour=I('black'), fill=NULL), data=precursorData) + scale_colour_discrete('', breaks='black', labels='Precursor ions')
+                }
+            }
+            if(!simple) {
+                scanData <- data %>% 
+                    group_by(mz) %>% 
+                    summarise(TIC=sum(intensity, na.rm=T), col=2, row=2)
+                chromData <- data.frame(object@data) %>% 
+                    group_by(retentionTime) %>% 
+                    summarise(TIC=sum(intensity, na.rm=T), col=1, row=1)
+                p <- p + geom_line(aes(y=TIC, fill=NULL), data=chromData)
+                p <- p + geom_segment(aes(yend=mz, x=TIC, xend=0, fill=NULL), data=scanData)
+                p <- p + facet_grid(row~col, scales='free')
+                
+                p <- p + theme(strip.background=element_blank(), strip.text=element_blank())
+                
+                gt <- ggplot_gtable(ggplot_build(p))
+                emptyGrobInd <- which(gt$layout$t == 4 & gt$layout$l == 6)
+                gt$grobs[[emptyGrobInd]] <- grob()
+                panels <- gt$layout$t[grep("panel", gt$layout$name)]
+                gt$heights[panels] <- lapply(c(1,3), unit, "null")
+                panels <- gt$layout$l[grep("panel", gt$layout$name)]
+                gt$widths[panels] <- lapply(c(3, 3, 1, 1), unit, "null")
+                gt$layout$r[gt$layout$name=='xlab'] <- 4
+                gt$layout$t[gt$layout$name=='ylab'] <- 6
+                gt <- gtable_add_grob(gt, textGrob('Intensity'), 8, 6)
+                gt <- gtable_add_grob(gt, textGrob('Intensity', rot=90), 4, 2)
+                
+                plot(gt)
+                invisible(gt)
+            } else {
+                p
+            }
         } else if(type == '3d') {
             if(!require(rgl)) {
                 stop('rgl package needed')
@@ -106,7 +157,7 @@ setMethod(
                 color = rbind(rep(cScale[1], nIons), endColours)
             )
             decorate3d(xlab='Retention time (sec)', ylab='m/z', zlab='Intensity', aspect=TRUE, box=FALSE, cex=3)
-            bg3d(col='lightblue')
+            bg3d(col='#abd9e9')   # #e0f3f8
         }
     }
 )

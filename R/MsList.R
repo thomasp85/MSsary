@@ -1,6 +1,7 @@
 ################################################################################
 # TODO: Add unique, split and c methods
 #       Add `[[` that returns a matrix
+#
 
 #' @include generics.R
 #' @include aaa.R

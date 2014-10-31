@@ -176,7 +176,7 @@ MsConnections <- setRefClass(
             dbGetPreparedQuery(
                 sary(), 
                 paste0(
-                    'INSERT INTO ', 
+                    'INSERT OR REPLACE INTO ', 
                     name, 
                     ' VALUES (',
                     paste(paste0('$', names(data)[nameMatch]), collapse=', '),
@@ -186,7 +186,7 @@ MsConnections <- setRefClass(
             )
             dbCommit(sary())
         },
-        getScans = function(ids) {
+        getScans = function(ids, raw=FALSE) {
             'Transparently extract scans, getting modified scans if they exists 
             or read from the raw file if they don\'t'
             
@@ -198,11 +198,26 @@ MsConnections <- setRefClass(
             }
             p
         },
-        setScans = function(ids, retentionTime, scans) {
-            'Set scans to new values and/or change the retention time of the scans'
+        setScans = function(ids, scans) {
+            'Set scans to new values'
+            ans <- data.frame(scanNum=ids, peaksCount=NA, totIonCurrent=NA, basePeakMZ=NA, basePeakIntensity=NA, lowMZ=NA, highMZ=NA, remove=0, scan=NA)
+            for(i in 1:length(ids)) {
+                cScan <- scans[[i]]
+                nPeaks <- nrow(cScan)
+                ans$peaksCount[i] <- nPeaks
+                ans$totIonCurrent[i] <- sum(cScan[, 2])
+                bpInd <- which.max(cScan[, 2])
+                ans$basePeakMZ[i] <- cScan[bpInd, 1]
+                ans$basePeakIntensity[i] <- cScan[bpInd, 2]
+                ans$lowMZ[i] <- cScan[1, 1]
+                ans$highMZ[i] <- cScan[nPeaks, 1]
+                ans$scan[i] <- list(serialize(as.vector(cScan), NULL))
+            }
+            addData('scans', ans)
         },
-        removeScans = function(ids) {
+        removeScans = function(ids, value=TRUE) {
             'Remove scans from the set'
+            
         },
         resetScan = function(ids) {
             'Reset the state of scans back to its original value'

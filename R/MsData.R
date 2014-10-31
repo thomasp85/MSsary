@@ -1,9 +1,13 @@
 ################################################################################
-# TODO: Add analysis history to sary file - include timestamp and MSsary version
-#
-#       Implement R*tree for storing peaks
+# TODO: Implement R*tree for storing peaks
 #
 #       Register identification object with specific methods
+#
+#       Copy method for MsData
+#
+#       Find solution on naming - should name be part of MsData or MsDataSet?
+#       If latter how should they be transferred to MsList object? Naming of the
+#       @connections list?
 #
 
 
@@ -254,6 +258,15 @@ setMethod(
     }
 )
 
+#' Peak detection in MsData object
+#' 
+setMethod(
+    'detectPeaks', 'MsData',
+    function(object, method, msLevel, ...) {
+        
+    }
+)
+
 ### CONSTRUCTORS
 
 #' Create an MsData object from a raw MS data file
@@ -312,7 +325,15 @@ createMsData <- function(rawFile) {
     
     dbGetQuery(
         connection$sary(), 
-        'CREATE VIEW currentRawHeader AS SELECT * FROM header WHERE acquisitionNum NOT IN (SELECT scanNum FROM scans WHERE retentionTime IS NULL)'
+        'CREATE VIEW currentRawHeader AS SELECT * FROM header WHERE acquisitionNum NOT IN (SELECT scanNum FROM scans)'
+    )
+    dbGetQuery(
+        connection$sary(), 
+        'CREATE VIEW currentModHeader AS SELECT h.seqNum, h.acquisitionNum, h.msLevel, h.polarity, s.peaksCount, s.totIonCurrent, h.retentionTime, s.basePeakMZ, s.basePeakIntensity, h.collisionEnergy, h.ionisationEnergy, s.lowMZ, s.highMZ, h.precursorScanNum, h.precursorMZ, h.precursorCharge, h.precursorIntensity, h.mergedScan, h.mergedResultScanNum, h.mergedResultStartScanNum, h.mergedResultEndScanNum FROM header AS h JOIN scans AS s ON h.acquisitionNum=s.scanNum AND s.remove == 0'
+    )
+    dbGetQuery(
+        connection$sary(),
+        'CREATE VIEW currentHeader AS SELECT * FROM currentRawHeader UNION SELECT * FROM currentModHeader ORDER BY seqNum'
     )
     
     new('MsData', connections=connection)

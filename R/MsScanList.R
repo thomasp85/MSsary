@@ -101,7 +101,7 @@ setMethod(
 #' 
 setMethod(
     'msPlot', 'MsScanList',
-    function(object, ...) {
+    function(object, simple = FALSE,  ...) {
         data <- meltMS(object)
         p <- ggplot(data) + theme_bw()
         if(any(scanMode(object) == 'centroid')) {
@@ -109,6 +109,16 @@ setMethod(
         }
         if(any(scanMode(object) == 'profile')) {
             p <- p + geom_line(aes(x=mz, y=intensity), data=subset(data, mode=='profile'))
+        }
+        if(length(object) == 1 && !simple) {
+            scanNum <- msInfo(object)$acquisitionNum
+            if(msInfo(object)$msLevel == 1) {
+                children <- dbGetQuery(con(object, 1)$sary(), paste0('SELECT precursorMZ FROM header WHERE precursorScanNum == ', scanNum))
+                if(nrow(children) != 0) {
+                    fragmentScans <- annotateChildren(data, children, scanMode(object))
+                    p <- p + geom_point(aes(x=mz, y=intensity, colour=I('black')), data=fragmentScans) + scale_colour_discrete('', breaks='black', labels='Precursor ions')
+                }
+            }
         }
         p <- p + facet_grid(sample ~ ., scales='free_y')
         p <- p + scale_y_continuous('Intensity') + scale_x_continuous('m/z')
