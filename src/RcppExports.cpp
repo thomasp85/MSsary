@@ -5,6 +5,29 @@
 
 using namespace Rcpp;
 
+// mqCpp
+List mqCpp(List scans, NumericVector scantime, double minIntensity, double minCentroids, double consecMissedLim, double ppm, double criticalVal, bool segs, bool scanBack);
+RcppExport SEXP MSsary_mqCpp(SEXP scansSEXP, SEXP scantimeSEXP, SEXP minIntensitySEXP, SEXP minCentroidsSEXP, SEXP consecMissedLimSEXP, SEXP ppmSEXP, SEXP criticalValSEXP, SEXP segsSEXP, SEXP scanBackSEXP) {
+BEGIN_RCPP
+    SEXP __sexp_result;
+    {
+        Rcpp::RNGScope __rngScope;
+        Rcpp::traits::input_parameter< List >::type scans(scansSEXP );
+        Rcpp::traits::input_parameter< NumericVector >::type scantime(scantimeSEXP );
+        Rcpp::traits::input_parameter< double >::type minIntensity(minIntensitySEXP );
+        Rcpp::traits::input_parameter< double >::type minCentroids(minCentroidsSEXP );
+        Rcpp::traits::input_parameter< double >::type consecMissedLim(consecMissedLimSEXP );
+        Rcpp::traits::input_parameter< double >::type ppm(ppmSEXP );
+        Rcpp::traits::input_parameter< double >::type criticalVal(criticalValSEXP );
+        Rcpp::traits::input_parameter< bool >::type segs(segsSEXP );
+        Rcpp::traits::input_parameter< bool >::type scanBack(scanBackSEXP );
+        List __result = mqCpp(scans, scantime, minIntensity, minCentroids, consecMissedLim, ppm, criticalVal, segs, scanBack);
+        PROTECT(__sexp_result = Rcpp::wrap(__result));
+    }
+    UNPROTECT(1);
+    return __sexp_result;
+END_RCPP
+}
 // getXIC
 NumericMatrix getXIC(List scans, double mzmin, double mzmax);
 RcppExport SEXP MSsary_getXIC(SEXP scansSEXP, SEXP mzminSEXP, SEXP mzmaxSEXP) {
