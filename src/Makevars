@@ -1,0 +1,12 @@
+MQOBJECTS=\
+	./massifquant/TrMgr.o \
+	./massifquant/Tracker.o \
+	./massifquant/SegProc.o \
+	./massifquant/DataKeeper.o \
+	./massifquant/OpOverload.o \
+	./massifquant/DataStore.o \
+	./massifquant.o
+
+SCANOBJECTS=scanFunctions.o
+
+OBJECTS= $(MQOBJECTS) $(SCANOBJECTS) RcppExports.o
