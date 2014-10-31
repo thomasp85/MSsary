@@ -1,8 +1,8 @@
 Package: MSsary
 Type: Package
 Title: LC-MS/MS analysis in R
-Version: 0.0.6
-Date: 2014-10-22
+Version: 0.0.7
+Date: 2014-10-31
 Author: Thomas Lin Pedersen
 Maintainer: Thomas Lin Pedersen <thomasp85@gmail.com>
 Description: This package facilitates working with LC-MS(/MS) data in R. It is
@@ -20,6 +20,8 @@ Imports:
     RSQLite,
     tools,
     ggplot2,
+    gtable,
+    grid,
     reshape2,
     dplyr,
     RColorBrewer,
@@ -38,9 +40,13 @@ Collate:
     'MsData.R'
     'MsList.R'
     'MsChromList.R'
+    'MsDataSet.R'
     'MsGroupList.R'
     'MsIonList.R'
     'MsPeakList.R'
     'MsScanList.R'
     'RcppExports.R'
     'ShallowMsList.R'
+    'peakMethods.R'
+    'preprocessors.R'
+    'zzz.R'

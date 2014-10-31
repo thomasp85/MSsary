@@ -1,3 +1,10 @@
+Version 0.0.6
+________________________________________________________________________________
+* Added peakMethodStore class to handle peak detection algorithms
+* Added modified version of massifquant from xcms
+* Huge improvements to MsIonList 2d plot
+* Add precursor markers on MsScanList plot
+
 Version 0.0.5
 ________________________________________________________________________________
 * Added filtering options for MsData scans method
