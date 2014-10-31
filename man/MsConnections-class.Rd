@@ -36,12 +36,14 @@ table, 'data' is a data.frame containing the data to be added.}
 \item{\code{addTable(name, definition)}}{Creates the table 'name' with the columns defined in 'definition'.
 The definition can be a character vector that will be concatenated with ', '.}
 
-\item{\code{getScans(ids)}}{Transparently extract scans, getting modified scans if they exists 
+\item{\code{getScans(ids, raw = FALSE)}}{Transparently extract scans, getting modified scans if they exists 
 or read from the raw file if they don't}
 
 \item{\code{raw()}}{Get the mzRramp connection in a safe manner}
 
 \item{\code{sary()}}{Get the sary database connection in a safe manner}
+
+\item{\code{setScans(ids, scans)}}{Set scans to new values}
 
 \item{\code{validate(subset = 10)}}{Checks that the header data matches between raw and sary}
 

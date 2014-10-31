@@ -3,7 +3,7 @@
 \alias{binIons}
 \title{Create profile data from ions}
 \usage{
-binIons(ions, fun = max, mzBins = 500, rtBins)
+binIons(ions, fun = max, mzBins = 500, rtBins = mzBins)
 }
 \description{
 This function takes a matrix of ion triples and bins the data to create well

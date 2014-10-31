@@ -19,7 +19,8 @@
 
 \S4method{[}{MsIonList,logical,missing,missing}(x, i, j, ..., drop = TRUE)
 
-\S4method{msPlot}{MsIonList}(object, type = "2d", ...)
+\S4method{msPlot}{MsIonList}(object, type = "2d", simple = FALSE,
+  precursors = !simple, ...)
 
 \S4method{msInfo}{MsIonList}(object)
 
