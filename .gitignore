@@ -3,3 +3,5 @@
 .RData
 .Rbuildignore
 *.Rproj
+*.o
+*.so
