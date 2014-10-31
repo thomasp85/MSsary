@@ -22,7 +22,7 @@ class TrMgr {
         int currMissedMax;
         double ppm;
         double criticalT;
-        int scanBack;
+        bool scanBack;
 
         std::vector<double> iData; //intensity for a given scan
         std::vector<double> mData; //mz
@@ -63,7 +63,7 @@ class TrMgr {
 
         TrMgr(int sidx, const double mi,
                 const int ml, const double cmm,
-                const double mass_acc, const double ct, const int sB);
+                const double mass_acc, const double ct, const bool sB);
 
         ~TrMgr();
 
@@ -87,7 +87,7 @@ class TrMgr {
 
         double getPpm();
 
-        std::vector<double> iterOverFeatures(int i, double * scanTime);
+        feature iterOverFeatures(int i, double * scanTime);
 
         void predictScan(const std::vector<double> & mzScan, const std::vector<double> & intenScan);
 

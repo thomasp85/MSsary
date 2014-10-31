@@ -10,7 +10,7 @@ using namespace std;
 TrMgr::TrMgr(int sidx, const double mi,
                  const int ml, const double cmm,
                  const double mass_acc, const double ct,
-                 const int sB)
+                 const bool sB)
   : currScanIdx(sidx),
     minIntensity(mi), minTrLen(ml),
     currMissedMax(cmm),
@@ -80,7 +80,7 @@ double TrMgr::getPpm() {
     return ppm;
 }
 
-std::vector<double> TrMgr::iterOverFeatures(int i, double * scanTime) {
+feature TrMgr::iterOverFeatures(int i, double * scanTime) {
         return trks[picIdx.at(i)]->getFeatureInfo(scanTime);
 }
 
@@ -262,7 +262,7 @@ void TrMgr::judgeTracker(const int & i) {
    }
     */
 
-    if (scanBack == 1) {
+    if (scanBack) {
         bool change = trks[i]->performScanBack();
         if (change == true) {
             trks[i]->computeMyXbar();
@@ -351,7 +351,7 @@ continue; }
             continue; }
 */
 
-        if (scanBack == 1) {
+        if (scanBack) {
             bool change = trks[*it]->performScanBack();
             if (change == true) {
                 trks[*it]->computeMyXbar();

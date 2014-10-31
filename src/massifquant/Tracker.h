@@ -13,6 +13,19 @@ const int INFOSIZE = 8;
 const double P_INIT_I = 10000;
 const double P_INIT_MZ = 0.000001; //10^(-6);
 const double MILLION = 1000000;
+
+struct feature {
+    double mz;
+    double mzmin;
+    double mzmax;
+    int scmin;
+    int scmax;
+    int length;
+    double intensity;
+    double maxint;
+    std::vector<double> ions;
+};
+
 class Tracker {
 
     private:
@@ -139,11 +152,11 @@ class Tracker {
         int claimDataIdx(const std::vector<double> & mData,
                 const std::vector<double>  & iData,
                 std::vector<double> & predDist,
-                int minTrLen, int scanBack);
+                int minTrLen, bool scanBack);
 
         bool performScanBack();
 
-        std::vector<double> getFeatureInfo(double * scanTime);
+        feature getFeatureInfo(double * scanTime);
 };
 
 

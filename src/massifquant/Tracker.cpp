@@ -249,7 +249,7 @@ void Tracker::innovateCentroid(const double & my,
 
 int Tracker::claimDataIdx(const std::vector<double> & mData,
 			  const std::vector<double> & iData,
-			  std::vector<double> & predDist, int minTrLen, int scanBack) {
+			  std::vector<double> & predDist, int minTrLen, bool scanBack) {
 
   //The returned data point index
   int centIdx;
@@ -259,7 +259,7 @@ int Tracker::claimDataIdx(const std::vector<double> & mData,
   double left = mrXhat[0] - mzErrMg;
   double right = mrXhat[0] + mzErrMg;
 
-  if ( (trLen >= minTrLen  - 1) && (scanBack == 1) ) {
+  if ( (trLen >= minTrLen  - 1) && scanBack ) {
      lowerList.push_back(left);
      upperList.push_back(right);
   }
@@ -293,22 +293,22 @@ int Tracker::claimDataIdx(const std::vector<double> & mData,
 }
 
 
-std::vector<double> Tracker::getFeatureInfo(double * scanTime) {
+feature Tracker::getFeatureInfo(double * scanTime) {
 
-    std::vector<double> featInfo(INFOSIZE);
+    feature featInfo;
     //1-mz center coordinate is mean
-    featInfo[0]=mzXbar;
+    featInfo.mz=mzXbar;
     //2-mz min
-    featInfo[1]= *min_element(mzList.begin(), mzList.end());
+    featInfo.mzmin = *min_element(mzList.begin(), mzList.end());
     //3-mz max
-    featInfo[2]= *max_element(mzList.begin(), mzList.end());
+    featInfo.mzmax = *max_element(mzList.begin(), mzList.end());
     //4-length
-    featInfo[3] = scanList.size();
+    featInfo.length = scanList.size();
     //5-scan min
-    featInfo[4]  = double(*min_element(scanList.begin(), scanList.end()));
+    featInfo.scmin  = double(*min_element(scanList.begin(), scanList.end()));
     //featInfo[4]  = scanTime[*min_element(scanList.begin(), scanList.end())];
     //6-scan max
-    featInfo[5] = double(*max_element(scanList.begin(), scanList.end()));
+    featInfo.scmax = double(*max_element(scanList.begin(), scanList.end()));
     //featInfo[5] = scanTime[*max_element(scanList.begin(), scanList.end())];
     //7-integrated (not normalized intensity)
     std::list<double>::iterator it_i;
@@ -316,15 +316,30 @@ std::vector<double> Tracker::getFeatureInfo(double * scanTime) {
     double maxInten = 0;
     /*note that sqrt transformation is one to one for values >= 0*/
     //Rprintf("\nIntensity Values\n");
+    std::vector<double> peak; 
+    peak.reserve(intensityList.size());
+    
+    int currentScan = featInfo.scmin-1;
+    double lastHeight = 0;
+    double lastTime = scanTime[currentScan];
+    
     for(it_i = intensityList.begin(); it_i != intensityList.end(); ++it_i) {
-        if (maxInten < *it_i) {
-            maxInten = *it_i;
+        double ion = *it_i;
+        if (maxInten < ion) {
+            maxInten = ion;
         }
         //Rprintf("%f\t", (*it_i)*(*it_i));
-        area += (*it_i)*(*it_i); //resquare it to original form
+        double areaSlice = (lastHeight + ion)*(scanTime[currentScan] - lastTime)/2;
+        lastHeight = ion;
+        lastTime = scanTime[currentScan];
+        ++currentScan;
+        
+        area += areaSlice; //resquare it to original form
+        peak.push_back(ion);
     }
-    featInfo[6]=area;
-    featInfo[7]=maxInten * maxInten;
+    featInfo.intensity = area;
+    featInfo.maxint = maxInten;
+    featInfo.ions = peak;
 
    /*verify some of my findings*/
    /* Rprintf("\nThe Scan Times\n");
@@ -377,9 +392,8 @@ double Tracker::computeMyXbar() {
     std::list<double>::iterator it_w = intensityList.begin();
     double intenSum = 0;
     for (it_m = mzList.begin(); it_m != mzList.end(); ++it_m) {
-        double inten2 = (*it_w) * (*it_w);
-        mzXbar += (*it_m) * inten2;
-        intenSum += inten2;
+        mzXbar += (*it_m) * (*it_w);
+        intenSum += *it_w;
         ++it_w;
     }
     mzXbar = mzXbar/intenSum; //mzList.size();
