@@ -3,12 +3,12 @@
 \alias{loadMsData}
 \title{Load in an already created sary file as an MsData object}
 \usage{
-loadMsData(rawFile, saryFile, testIntegrity = TRUE, testSize = 10)
+loadMsData(saryFile, rawFile, testIntegrity = TRUE, testSize = 10)
 }
 \arguments{
-\item{rawFile}{The path to the raw datafile}
-
 \item{saryFile}{The path to the sary database file}
+
+\item{rawFile}{The path to the raw datafile}
 
 \item{testIntegrity}{Should the raw and sary file be compared to each other}
 

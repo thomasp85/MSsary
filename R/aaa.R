@@ -1,21 +1,3 @@
-#' Get the current version of a package
-#' 
-#' This function reads the version from a package from the description file
-#' 
-#' @param package The package to get the version for
-#' 
-#' @return A string with the version
-#' 
-#' @noRd
-#' 
-getVersion <- function(package = 'MSsary') {
-    desc <- readLines(system.file('DESCRIPTION', package=package))
-    vers <- desc[grep('Version:', desc, ignore.case = TRUE)]
-    vers <- sub('Version: ', '', vers, ignore.case = TRUE)
-    return(vers)
-}
-.MSsary_version <- getVersion()
-
 #' Asses the mode of a spectrum
 #' 
 #' This function checks whether a spectrum is present in profile or centroid
@@ -233,63 +215,110 @@ getScanList <- function(object, query) {
 #' 
 #' @noRd
 #' 
-getAcqNum <- function(con, seqNum, retentionTime, TIC, BPC, nPeaks, msLevels, isParent, isChild) {
-    query <- c()
+getAcqNum <- function(con, ..., raw=FALSE) {
+    table <- ifelse(raw, 'header', 'currentHeader')
+    filter <- 'none'
+    query <- lapply(list(...), toFilter)
+    if(length(query) != 0) {
+        filter <- 'some'
+        query <- mapply(fillSQL, filter=query, name=names(query), SIMPLIFY=FALSE)
+        query <- do.call(combineSQL, query)
+    }
+    switch(
+        filter,
+        none = list(as.integer(dbGetQuery(con$sary(), paste0('SELECT acquisitionNum FROM ', table))$acquisitionNum)),
+        some = lapply(query, function(x) {
+            as.integer(dbGetQuery(con$sary(), paste0('SELECT acquisitionNum FROM ', table, ' ', x))$acquisitionNum)
+        })
+    )
+}
+
+#' Extract a continuous range of acquisitionNums from the same MS level
+#' 
+#' This function works as getAcqNum, but are constrained to only extract a 
+#' single continuous interval from the same MS level such as needed when 
+#' extracting peaks etc.
+#' 
+getContAcqNum <- function(con, seqNum, retentionTime, msLevel) {
+    msLevel <- toFilter(msLevel)
+    if(msLevel$type != 'EQUALS') {
+        stop('Only one msLevel can be selected')
+    }
+    if(!missing(seqNum) && !missing(retentionTime)) {
+        stop('Either use seqNum or retentionTime - not both')
+    }
+    arguments <- list(con=con, msLevel=msLevel)
     if(!missing(seqNum)) {
-        if(class(seqNum) != 'matrix') {
-            seqNum <- matrix(seqNum, ncol=2, byrow=TRUE)
+        if(!rangeFilter(seqNum)) {
+            stop('seqNum must specifiy an interval: Use either \'BETWEEN\', \'ABOVE\' or \'BELOW\'')
         }
-        query <- c(query, constructInterval('seqNum', seqNum))
+        arguments$seqNum <- seqNum
     }
     if(!missing(retentionTime)) {
-        if(class(retentionTime) != 'matrix') {
-            retentionTime <- matrix(retentionTime, ncol=2, byrow=TRUE)
+        if(!rangeFilter(retentionTime)) {
+            stop('retentionTime must specifiy an interval: Use either \'BETWEEN\', \'ABOVE\' or \'BELOW\'')
         }
-        query <- c(query, constructInterval('retentionTime', retentionTime))
+        arguments$retentionTime <- retentionTime
     }
-    if(!missing(TIC)) {
-        if(class(TIC) != 'matrix') {
-            TIC <- matrix(TIC, ncol=2, byrow=TRUE)
-        }
-        query <- c(query, constructInterval('TIC', TIC))
+    do.call(getAcqNum, arguments)
+}
+
+#' Get peakIDs based on a filter
+#' 
+#' Similar to getAcqNum but used to extract peakID instead
+#' 
+getPeakIds <- function(con, seqNum, retentionTime, mz, ...) {
+    filters <- 'none'
+    locQuery <- list()
+    if(!missing(retentionTime)) {
+        nFilter <- rtToSeqFilter(retentionTime, con)
+        locQuery <- c(locQuery, list(fillSQL(nFilter, 'scanStart', 'scanEnd')))
     }
-    if(!missing(BPC)) {
-        if(class(BPC) != 'matrix') {
-            BPC <- matrix(BPC, ncol=2, byrow=TRUE)
-        }
-        query <- c(query, constructInterval('BPC', BPC))
+    if(!missing(seqNum)) {
+        locQuery <- c(locQuery, list(fillSQL(seqNum, 'scanStart', 'scanEnd')))
     }
-    if(!missing(nPeaks)) {
-        if(class(nPeaks) != 'matrix') {
-            nPeaks <- matrix(nPeaks, ncol=2, byrow=TRUE)
-        }
-        query <- c(query, constructInterval('nPeaks', nPeaks))
+    if(!missing(mz)) {
+        locQuery <- c(locQuery, list(fillSQL(mz, 'mzMin', 'mzMax')))
     }
-    if(!missing(msLevels)) {
-        query <- c(query, paste0('(msLevel IN (', paste(msLevels, collapse=', '),'))'))
+    infoQuery <- lapply(list(...), toFilter)
+    
+    if(length(locQuery) != 0) {
+        filters <- 'location'
+        locQueryStrings <- do.call(combineSQL, locQuery)
     }
-    if(!missing(isParent)) {
-        subQuery <- '(SELECT precursorScanNum FROM header)'
-        if(isParent) {
-            query <- c(query, paste0('(acquisitionNum IN ', subQuery, ')'))
+    if(length(infoQuery) != 0) {
+        filters <- 'info'
+        infoQuery <- query <- mapply(fillSQL, filter=infoQuery, name=names(infoQuery), SIMPLIFY=FALSE)
+        infoQueryStrings <- do.call(combineSQL, infoQuery)
+    }
+    if(length(locQuery) != 0 && length(infoQuery) != 0) {
+        filters <- 'both'
+        if(length(locQueryStrings) < length(infoQueryStrings)) {
+            locQueryStrings <- do.call(combineSQL, c(locQuery, nSQL=length(infoQueryStrings)))
         } else {
-            query <- c(query, paste0('(acquisitionNum NOT IN ', subQuery, ')'))
+            infoQueryStrings <- do.call(combineSQL, c(infoQuery, nSQL=length(locQueryStrings)))
         }
     }
-    if(!missing(isChild)) {
-        if(isChild) {
-            query <- c(query, paste0('(precursorScanNum != 0)'))
-        } else {
-            query <- c(query, paste0('(precursorScanNum == 0)'))
+    
+    switch(
+        filters,
+        none = list(as.integer(dbGetQuery(con$sary(), 'SELECT peakID FROM peakLoc')$peakID)),
+        location = lapply(locQueryStrings, function(x) {
+            as.integer(dbGetQuery(con$sary(), paste0('SELECT peakID FROM peakLoc ', x))$peakID)
+        }),
+        info = lapply(infoQueryStrings, function(x) {
+            as.integer(dbGetQuery(con$sary(), paste0('SELECT peakID FROM peakInfo ', x))$peakID)
+        }),
+        both = {
+            locID <- lapply(locQueryStrings, function(x) {
+                as.integer(dbGetQuery(con$sary(), paste0('SELECT peakID FROM peakLoc ', x))$peakID)
+            })
+            infoID <- lapply(infoQueryStrings, function(x) {
+                as.integer(dbGetQuery(con$sary(), paste0('SELECT peakID FROM peakInfo ', x))$peakID)
+            })
+            mapply(intersect, locID, infoID, SIMPLIFY=FALSE)
         }
-    }
-    query <- paste(query, collapse=' AND ')
-    if(query == '') {
-        query <- 'SELECT acquisitionNum FROM header'
-    } else {
-        query <- paste0('SELECT acquisitionNum FROM header WHERE (', query, ')')
-    }
-    dbGetQuery(con$sary(), query)$acquisitionNum
+    )
 }
 
 #' Create a set of intervals based on a two column matrix
@@ -331,15 +360,6 @@ constructInterval <- function(name, interval) {
     }
     query <- query[!is.na(query)]
     paste0('(', paste(query, collapse=' OR '), ')')
-}
-
-createChromNames <- function(object, info) {
-    name <- file_path_sans_ext(basename(con(object)$saryFile))
-    name <- paste0(name, ': ', floor(info$minRT), '-', ceiling(info$maxRT))
-    if(!is.null(info$minMZ)) {
-        name <- paste0(name, ', ', floor(info$minMZ), '-', ceiling(info$maxMZ))
-    }
-    name
 }
 
 #' Create profile data from ions
@@ -417,4 +437,61 @@ annotateChildren <- function(data, children, mode) {
     diffs <- abs(outer(data$mz, children$precursorMZ, `-`))
     cInd <- apply(diffs, 2, which.min)
     data[cInd,]
+}
+
+#' Extract mzR file location from sary file
+#' 
+getMzrPath <- function(saryPath) {
+    db <- dbConnect(dbDriver('SQLite'), saryPath)
+    rawPath <- dbGetQuery(db, 'SELECT location FROM mzR')$location
+    dbDisconnect(db)
+    rawPath
+}
+#' Return a call in which all of the arguments which were supplied
+#' or have presets are specified by their full names and supplied
+#' or default values.
+#'  
+#' @param definition a function. See \code{\link[base]{match.call}}.
+#' @param call an unevaluated call to the function specified by definition.
+#'  See \code{\link[base]{match.call}}.
+#' @param expand.dots logical. Should arguments matching ... in the call be 
+#'  included or left as a ... argument? See \code{\link[base]{match.call}}.
+#' @param doEval logical, defaults to TRUE. Should function arguments be 
+#'  evaluated in the returned call or not?
+#'
+#' @return An object of class call. 
+#' @author fabians
+#' @seealso \code{\link[base]{match.call}}
+#' @references \href{http://stackoverflow.com/questions/3478923/displaying-the-actual-parameter-list-of-the-function-during-execution}{Stack Overflow answer}
+#' 
+expand.call <- function(definition=NULL, call=sys.call(sys.parent(1)), expand.dots = TRUE, doEval=TRUE) {
+    safeDeparse <- function(expr){
+        #rm line breaks, whitespace             
+        ret <- paste(deparse(expr), collapse="")
+        return(gsub("[[:space:]][[:space:]]+", " ", ret))
+    }
+    
+    call <- .Internal(match.call(definition, call, expand.dots))
+    
+    #supplied args:
+    ans <- as.list(call)
+    if(doEval) {
+        for(i in 2:length(ans)) {
+            ans[[i]] <- eval(ans[[i]])
+        }
+    }
+    
+    #possible args:
+    frmls <- formals(safeDeparse(ans[[1]]))
+    #remove formal args with no presets:
+    frmls <- frmls[!sapply(frmls, is.symbol)]
+    
+    add <- which(!(names(frmls) %in% names(ans)))
+    return(as.call(c(ans, frmls[add])))
+}
+
+#' Deparse call into a single text string
+#' 
+callToString <- function(call) {
+    paste(sub('^\\s+', '', deparse(call)), collapse='')
 }

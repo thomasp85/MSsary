@@ -293,7 +293,7 @@ int Tracker::claimDataIdx(const std::vector<double> & mData,
 }
 
 
-feature Tracker::getFeatureInfo(double * scanTime) {
+feature Tracker::getFeatureInfo(const std::vector<double> & scanTime) {
 
     feature featInfo;
     //1-mz center coordinate is mean
@@ -311,31 +311,33 @@ feature Tracker::getFeatureInfo(double * scanTime) {
     featInfo.scmax = double(*max_element(scanList.begin(), scanList.end()));
     //featInfo[5] = scanTime[*max_element(scanList.begin(), scanList.end())];
     //7-integrated (not normalized intensity)
-    std::list<double>::iterator it_i;
+    
     double area = 0;
     double maxInten = 0;
     /*note that sqrt transformation is one to one for values >= 0*/
     //Rprintf("\nIntensity Values\n");
-    std::vector<double> peak; 
-    peak.reserve(intensityList.size());
+    vector<double> peak; 
+    peak.reserve(intensityList.size()*2);
     
-    int currentScan = featInfo.scmin-1;
+    list<int>::reverse_iterator currentScan = scanList.rbegin();
     double lastHeight = 0;
-    double lastTime = scanTime[currentScan];
+    double lastTime = scanTime[(*currentScan) - 1];
     
-    for(it_i = intensityList.begin(); it_i != intensityList.end(); ++it_i) {
+    list<double>::reverse_iterator it_i;
+    for(it_i = intensityList.rbegin(); it_i != intensityList.rend(); ++it_i) {
         double ion = *it_i;
         if (maxInten < ion) {
             maxInten = ion;
         }
         //Rprintf("%f\t", (*it_i)*(*it_i));
-        double areaSlice = (lastHeight + ion)*(scanTime[currentScan] - lastTime)/2;
+        double areaSlice = (lastHeight + ion)*(scanTime[(*currentScan) - 1] - lastTime)/2;
         lastHeight = ion;
-        lastTime = scanTime[currentScan];
+        lastTime = scanTime[(*currentScan) - 1];
         ++currentScan;
         
         area += areaSlice; //resquare it to original form
-        peak.push_back(ion);
+        peak.push_back(lastTime);
+        peak.push_back(lastHeight);
     }
     featInfo.intensity = area;
     featInfo.maxint = maxInten;

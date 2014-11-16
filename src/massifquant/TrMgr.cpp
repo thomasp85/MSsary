@@ -80,7 +80,7 @@ double TrMgr::getPpm() {
     return ppm;
 }
 
-feature TrMgr::iterOverFeatures(int i, double * scanTime) {
+feature TrMgr::iterOverFeatures(int i, const vector<double> & scanTime) {
         return trks[picIdx.at(i)]->getFeatureInfo(scanTime);
 }
 

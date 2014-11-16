@@ -6,7 +6,8 @@
 #include <list>
 #include <vector>
 #include <map>
-#include "DataKeeper.h"
+#include <R.h>
+#include <Rdefines.h>
 #include "OpOverload.h"
 #include "Tracker.h"
 
@@ -87,7 +88,7 @@ class TrMgr {
 
         double getPpm();
 
-        feature iterOverFeatures(int i, double * scanTime);
+        feature iterOverFeatures(int i, const std::vector<double> & scanTime);
 
         void predictScan(const std::vector<double> & mzScan, const std::vector<double> & intenScan);
 

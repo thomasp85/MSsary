@@ -1,6 +1,5 @@
 ################################################################################
-# TODO: Should multiple ion sets be handled by one object? how shuld plotting
-#       behave in that case
+# TODO: 
 #
 
 #' @include aaa.R
@@ -39,35 +38,19 @@ setClass(
 setMethod(
     'show', 'MsIonList',
     function(object) {
-        cat('An MsIonList object with', length(object), 'ions\n')
+        cat('An MsIonList object with', length(object), 'ion sets\n')
     }
 )
-
-#' @describeIn MsIonList The number of ions
-#' 
-setMethod(
-    'length', 'MsIonList',
-    function(x) {
-        nrow(x@data)
-    }
-)
-
-#' @describeIn MsIonList Subset an MsList object
+#' @describeIn MsIonList Get the names of the scans
 #' 
 #' @param x An MsIonList object
 #' 
 setMethod(
-    '[', c('MsIonList', 'numeric', 'missing', 'missing'),
-    function(x, i, j, ..., drop=TRUE) {
-        stop('MsIonList cannot be subsetted')
-    }
-)
-#' @describeIn MsIonList Subset an MsList object
-#' 
-setMethod(
-    '[', c('MsIonList', 'logical', 'missing', 'missing'),
-    function(x, i, j, ..., drop=TRUE) {
-        stop('MsIonList cannot be subsetted')
+    'names', 'MsIonList',
+    function(x) {
+        n <- callNextMethod()
+        n <- paste0(n, x@info$msLevel, ', ', floor(x@info$minRT), '-', ceiling(x@info$maxRT), ', ', floor(x@info$minMZ), '-', ceiling(x@info$maxMZ))
+        n
     }
 )
 
@@ -81,6 +64,7 @@ setMethod(
 setMethod(
     'msPlot', 'MsIonList',
     function(object, type='2d', simple=FALSE, precursors=!simple, ...) {
+        if(length(object) != 1) stop('Only plotting of single ionsets supported atm.')
         data <- data.frame(object@data)
         cScale <- brewer.pal(9, 'YlOrRd')
         if(type == '2d') {
@@ -168,15 +152,12 @@ setMethod(
     'scans', 'MsIonList',
     function(object, ...) {
         info <- msInfo(object)
-        con <- con(object, 1)
-        acqNum <- getAcqNum(con, retentionTime=c(info$minRT, info$maxRT), msLevels=info$msLevel)
-        scans <- con$getScans(acqNum)
-        info <- dbGetQuery(con$sary(), paste0('SELECT * FROM header WHERE acquisitionNum IN (', paste(acqNum, collapse=', '), ')'))
-        mapping <- getListMapping(scans, 1)
-        mapping <- cbind(mapping, matrix(isCentroided(scans), dimnames = list(NULL, 'mode')))
-        scans <- do.call(rbind, scans)
-        colnames(scans) <- c('mz', 'intensity')
-        new('MsScanList', connections=list(con), info=info, data=scans, mapping=mapping)
+        res <- list()
+        for(i in 1:length(object)) {
+            iCon <- con(object, i, 'MsData')
+            res[[i]] <- scans(iCon, msLevel=info$msLevel[i], retentionTime=BETWEEN(info$minRT[i], info$maxRT[i]))
+        }
+        res
     }
 )
 
@@ -185,40 +166,59 @@ setMethod(
 setMethod(
     'chroms', 'MsIonList',
     function(object, ...) {
-        con <- con(object, 1)
-        res <- data.frame(msData(object)) %>%
-            group_by(retentionTime) %>%
-            select(intensity) %>%
-            summarise(TIC=sum(intensity), BPC=max(intensity)) %>%
-            arrange(retentionTime)
-        res <- as.data.frame(res)
-        acqNum <- dbGetQuery(
-            con$sary(), 
-            paste0(
-                'SELECT acquisitionNum, retentionTime FROM header WHERE retentionTime >= ',
-                msInfo(object)$minRT,
-                ' AND retentionTime <= ',
-                msInfo(object)$maxRT,
-                ' AND msLevel == ',
-                msInfo(object)$msLevel
+        data <- lapply(msData(object), function(x) {
+            chrom <- data.frame(x) %>%
+                group_by(retentionTime) %>%
+                select(intensity) %>%
+                summarise(TIC=sum(intensity), BPC=max(intensity)) %>%
+                arrange(retentionTime)
+            as.matrix(chrom)
+        })
+        for(i in unique(object@mapping[, 'conIndex'])) {
+            elIndex <- object@mapping[, 'conIndex'] == i
+            acqNum <- dbGetPreparedQuery(
+                con(object, i)$sary(), 
+                'SELECT acquisitionNum, retentionTime 
+                FROM header 
+                WHERE retentionTime >= $minRT 
+                    AND retentionTime <= $maxRT 
+                    AND msLevel == $msLevel',
+                bind.data=msInfo(object)[elIndex, , drop=FALSE]
             )
-        )
-        data <- list(merge(acqNum, res))
+            data[elIndex] <- lapply(data[elIndex], function(x) {
+                as.matrix(merge(acqNum, x))
+            })
+        }
         info <- data.frame(
-            name=NA, 
             msLevel=msInfo(object)$msLevel,
-            nScan=nrow(data[[1]]), 
-            maxTIC=max(data[[1]]$TIC), 
-            maxBPC=max(data[[1]]$BPC), 
+            nScan=sapply(data, nrow), 
+            maxTIC=sapply(data, function(x) max(x[,'TIC'])), 
+            maxBPC=sapply(data, function(x) max(x[,'BPC'])), 
             minRT=msInfo(object)$minRT, 
             maxRT=msInfo(object)$maxRT,
             minMZ=msInfo(object)$minMZ,
             maxMZ=msInfo(object)$maxMZ
         )
-        info$name <- createChromNames(object, info)
-        mapping <- getListMapping(data, 1)
-        data <- as.matrix(do.call(rbind, data))
-        new('MsChromList', connections=list(con), info=info, data=data, mapping=mapping)
+        mapping <- getListMapping(data, object@mapping[, 'conIndex'])
+        data <- do.call(rbind, data)
+        new('MsChromList', connections=object@connections, info=info, data=data, mapping=mapping)
+    }
+)
+
+#' Extract peaks from an MsIonList
+#' 
+setMethod(
+    'peaks', 'MsIonList',
+    function(object, overlap=FALSE) {
+        info <- msInfo(object)
+        res <- list()
+        for(i in 1:length(object)) {
+            iCon <- con(object, i, 'MsData')
+            retRange <- ifelse(overlap, OVERLAPS(info$minRT[i], info$maxRT[i]), BETWEEN(info$minRT[i], info$maxRT[i]))
+            mzRange <- ifelse(overlap, OVERLAPS(info$minMZ[i], info$maxMZ[i]), BETWEEN(info$minMZ[i], info$maxMZ[i]))
+            res[[i]] <- peaks(iCon, msLevel=info$msLevel[i], retentionTime=retRange, mz=mzRange)
+        }
+        res
     }
 )
 
@@ -242,7 +242,7 @@ setMethod(
 setMethod(
     'msData', 'MsIonList',
     function(object) {
-        object@data
+        callNextMethod()
     }
 )
 

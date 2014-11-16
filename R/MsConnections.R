@@ -20,8 +20,8 @@
 #' 
 #' @seealso \code{\linkS4class{MsData}}
 #' 
-#' @importFrom DBI dbConnect dbDriver dbGetQuery dbCommit dbDisconnect dbListTables dbExistsTable
-#' @importFrom RSQLite dbBeginTransaction dbGetPreparedQuery isIdCurrent
+#' @importFrom DBI dbConnect dbDriver dbGetQuery dbDisconnect dbListTables dbExistsTable
+#' @importFrom RSQLite dbGetPreparedQuery dbIsValid
 #' @importFrom mzR isInitialized openMSfile header
 #' 
 MsConnections <- setRefClass(
@@ -30,7 +30,8 @@ MsConnections <- setRefClass(
         rawFile='character',
         ramp='mzRramp',
         saryFile='character',
-        saryDB='SQLiteConnection'),
+        saryDB='SQLiteConnection'
+    ),
     methods=list(
         initialize = function(raw, sary, ...) {
             if(class(raw) != 'character' || class(sary) != 'character') {
@@ -68,11 +69,11 @@ MsConnections <- setRefClass(
             'Verify that the default tables are present and their structure conforms'
             
             presentTables <- dbListTables(sary())
-            tablesConform <- all(c('header', 'scans', 'peaks') %in% presentTables)
+            tablesConform <- all(c('header', 'scans', 'peakInfo') %in% presentTables)
             
             headerCols <- dbGetQuery(sary(), 'PRAGMA table_info(header)')$name
             scansCols <- dbGetQuery(sary(), 'PRAGMA table_info(scans)')$name
-            peaksCols <- dbGetQuery(sary(), 'PRAGMA table_info(peaks)')$name
+            peaksCols <- dbGetQuery(sary(), 'PRAGMA table_info(peakInfo)')$name
             
             trueHeaderCols <- sapply(strsplit(headerTableFormat, ' '), function(x) x[1])
             trueScansCols <- sapply(strsplit(scanTableFormat, ' '), function(x) x[1])
@@ -92,11 +93,11 @@ MsConnections <- setRefClass(
             'Checks that the header data matches between raw and sary'
             
             saryLength <- dbGetQuery(sary(), 'SELECT Count(*) FROM header')
-            rawLength <- base::length(raw())
+            rawLength <- base::length(mzR())
             if(saryLength != rawLength) return(FALSE)
             
             randIndex <- sample(1:rawLength, size = subset, replace = FALSE)
-            randRaw <- header(raw(), randIndex)
+            randRaw <- header(mzR(), randIndex)
             randRaw <- randRaw[order(randRaw$seqNum),]
             rownames(randRaw) <- NULL
             
@@ -110,7 +111,7 @@ MsConnections <- setRefClass(
             )
             return(isTRUE(all.equal(randRaw, randSary)))
         },
-        raw = function() {
+        mzR = function() {
             'Get the mzRramp connection in a safe manner'
             
             if(!file.exists(rawFile)) {
@@ -131,25 +132,35 @@ MsConnections <- setRefClass(
             if(!file.exists(saryFile)) {
                 stop('Database file no longer present at:', saryFile)
             }
-            if(!isIdCurrent(saryDB)) {
+            if(!dbIsValid(saryDB)) {
                 saryDB <<- dbConnect(dbDriver('SQLite'), saryFile)
             }
             
             return(saryDB)
         },
-        addTable = function(name, definition) {
+        addTable = function(name, definition, rtree=FALSE) {
             'Creates the table \'name\' with the columns defined in \'definition\'.
             The definition can be a character vector that will be concatenated with \', \'.'
             
             if(dbExistsTable(sary(), name)) stop('Table already exists')
+            if(rtree) {
+                newTable <- paste0(
+                   'CREATE VIRTUAL TABLE ',
+                   name,
+                   ' USING rtree(',
+                   paste(definition, collapse=', '),
+                   ')'
+                )
+            } else {
+                newTable <- paste0(
+                    'CREATE TABLE ', 
+                    name, 
+                    ' (',
+                    paste(definition, collapse=', '),
+                    ')'
+                )
+            }
             
-            newTable <- paste0(
-                'CREATE Table ', 
-                name, 
-                '(',
-                paste(definition, collapse=', '),
-                ')'
-            )
             dbGetQuery(sary(), newTable)
         },
         addData = function(name, data) {
@@ -163,28 +174,83 @@ MsConnections <- setRefClass(
                 paste0('PRAGMA table_info(', name,')')
             )
             nameMatch <- names(data) %in% tableDef$name
-            if(any(!nameMatch)) warning(sum(!nameMatch), ' Columns ignored')
-            
-            missingNames <- tableDef$name[!tableDef$name %in% names(data)]
-            if(base::length(missingNames) != 0) {
-                for(i in missingNames) {
-                    data[, i] <- NA
-                }
+            if(any(!nameMatch)) {
+                warning(sum(!nameMatch), ' Columns ignored')
             }
             
-            dbBeginTransaction(sary())
             dbGetPreparedQuery(
                 sary(), 
                 paste0(
-                    'INSERT OR REPLACE INTO ', 
+                    'INSERT INTO ', 
                     name, 
-                    ' VALUES (',
+                    ' (',
+                    paste(names(data)[nameMatch], collapse=', '),
+                    ') VALUES (',
                     paste(paste0('$', names(data)[nameMatch]), collapse=', '),
                     ')'
                 ),
                 bind.data=data
             )
-            dbCommit(sary())
+        },
+        updateData = function(name, data, key) {
+            'Updates column in already existing data'
+            
+            if(!dbExistsTable(sary(), name)) stop('Table don\'t exists')
+            
+            tableDef <- dbGetQuery(
+                sary(), 
+                paste0('PRAGMA table_info(', name,')')
+            )
+            nameMatch <- names(data) %in% tableDef$name
+            if(any(!nameMatch)) {
+                warning(sum(!nameMatch), ' Columns ignored')
+            }
+            if(key %in% names(data)[!nameMatch]) {
+                stop('key doesn\'t exist')
+            }
+            keyMatch <- names(data) %in% key
+            nameMatch <- nameMatch & !keyMatch
+            
+            dbGetPreparedQuery(
+                sary(), 
+                paste0(
+                    'UPDATE ', 
+                    name, 
+                    ' SET ',
+                    paste(paste0(names(data)[nameMatch], ' = $', names(data)[nameMatch]), collapse=', '),
+                    ' WHERE ',
+                    paste(paste0(names(data)[keyMatch], ' = $', names(data)[keyMatch]), collapse=', ')
+                ),
+                bind.data=data
+            )
+        },
+        setData = function(name, data, key) {
+            'Insert or update data depending on the existence of key'
+            
+            keys <- dbGetQuery(
+                sary(),
+                paste0(
+                    'SELECT ',
+                    key,
+                    ' FROM ',
+                    name
+                )
+            )
+            existing <- keys %in% data[, key]
+            updateData(name, data[existing,], key)
+            addData(name, data[!existing,])
+        },
+        getHeader = function(ids, raw=FALSE) {
+            dbGetQuery(
+                sary(), 
+                paste0(
+                    'SELECT * FROM ', 
+                    ifelse(raw, 'header', 'currentHeader'), 
+                    ' WHERE acquisitionNum IN (', 
+                    paste(ids, collapse=', '), 
+                    ')'
+                )
+            )
         },
         getScans = function(ids, raw=FALSE) {
             'Transparently extract scans, getting modified scans if they exists 
@@ -192,7 +258,7 @@ MsConnections <- setRefClass(
             
             seqNum <- dbGetQuery(sary(), paste0('SELECT seqNum, acquisitionNum FROM header WHERE acquisitionNum IN (', paste(ids, collapse=', '), ')'))
             seqNum <- seqNum[match(ids, seqNum$acquisitionNum), ]
-            p <- peaks(raw(), seqNum$seqNum)
+            p <- mzR::peaks(mzR(), seqNum$seqNum)
             if(class(p) == 'matrix') {
                 p <- list(p)
             }
@@ -222,6 +288,20 @@ MsConnections <- setRefClass(
         resetScan = function(ids) {
             'Reset the state of scans back to its original value'
         },
+        getPeaks = function(ids) {
+            'Extract peaks from database'
+            
+            peaks <- dbGetQuery(
+                sary(),
+                paste0(
+                    'SELECT * FROM (SELECT * FROM peakLoc WHERE peakID IN (',
+                    paste(ids, collapse=', '),
+                    ')) JOIN peakInfo USING (peakID)'
+                )
+            )
+            peaks$peak <- lapply(peaks$peak, unserialize)
+            peaks
+        },
         extractIC = function(acqNum, mzwin) {
             scanNum <- sort(unique(do.call('c', acqNum)))
             scans <- getScans(scanNum)
@@ -229,7 +309,11 @@ MsConnections <- setRefClass(
             XIC <- list()
             for(i in 1:base::length(acqNum)) {
                 scIndex <- match(acqNum[[i]], scanNum)
-                scData <- getXIC(scans[scIndex], mzmin=mzwin[i, 1], mzmax=mzwin[i, 2])
+                scData <- lapply(scans[scIndex], function(x) {
+                    xic <- x[mzwin[[i]](x[,1]), 2]
+                    c(sum(xic), max(xic))
+                })
+                scData <- do.call(rbind, scData)
                 scData <- cbind(scanInfo[scIndex, ], scData)
                 names(scData)[3:4] <- c('totIonCurrent', 'basePeakIntensity')
                 XIC[[i]] <- scData
@@ -247,7 +331,7 @@ MsConnections <- setRefClass(
                 ionData <- cbind(do.call(rbind, scans[scIndex]), rtCurrent)
                 colnames(ionData) <- c('mz', 'intensity', 'retentionTime')
                 if(!is.null(mzwin)){
-                    ionData <- ionData[ionData[, 'mz'] > mzwin[1] & ionData[, 'mz'] < mzwin[2], ]
+                    ionData <- ionData[mzwin[[i]](ionData[, 'mz']), ]
                 }
                 ionData <- ionData[ionData[, 'intensity'] != 0,]
                 ions[[i]] <- ionData
@@ -261,7 +345,23 @@ MsConnections <- setRefClass(
             cat('Sary database:', saryFile, '\n')
         },
         length = function() {
-            as.numeric(dbGetQuery(sary(), 'SELECT Count(*) FROM header'))
+            as.numeric(dbGetQuery(sary(), 'SELECT Count(acquisitionNum) FROM currentHeader'))
+        },
+        nPeaks = function() {
+            as.numeric(dbGetQuery(sary(), 'SELECT Count(OID) FROM peakInfo'))
         }
     )
+)
+
+setMethod(
+    '==', c('MsConnections', 'MsConnections'),
+    function(e1, e2) {
+        (e1$rawFile == e2$rawFile) && (e1$saryFile == e2$saryFile)
+    }
+)
+setMethod(
+    '!=', c('MsConnections', 'MsConnections'),
+    function(e1, e2) {
+        !(e1 == e2)
+    }
 )

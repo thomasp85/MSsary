@@ -3,10 +3,13 @@
 \name{meltMS,MsChromList-method}
 \alias{meltMS}
 \alias{meltMS,MsChromList-method}
+\alias{meltMS,MsPeakList-method}
 \alias{meltMS,MsScanList-method}
 \title{Create ggplot2 ready data from object}
 \usage{
 \S4method{meltMS}{MsChromList}(object)
+
+\S4method{meltMS}{MsPeakList}(object)
 
 \S4method{meltMS}{MsScanList}(object)
 
@@ -25,6 +28,8 @@ ready for use in ggplot2 functions.
 \section{Methods (by class)}{
 \itemize{
 \item \code{MsChromList}: melt an MsChromList
+
+\item \code{MsPeakList}: melt an MsPeakList
 
 \item \code{MsScanList}: melt an MsScanList
 }}

@@ -4,7 +4,7 @@
 \alias{detectPeaks,MsData-method}
 \title{Peak detection in MsData object}
 \usage{
-\S4method{detectPeaks}{MsData}(object, method, msLevel, ...)
+\S4method{detectPeaks}{MsData}(object, method, ...)
 }
 \description{
 Peak detection in MsData object

@@ -156,7 +156,7 @@ class Tracker {
 
         bool performScanBack();
 
-        feature getFeatureInfo(double * scanTime);
+        feature getFeatureInfo(const std::vector<double> & scanTime);
 };
 
 

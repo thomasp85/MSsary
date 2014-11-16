@@ -8,6 +8,7 @@
 \alias{msData,MsScanList-method}
 \alias{msInfo,MsScanList-method}
 \alias{msPlot,MsScanList-method}
+\alias{names,MsScanList-method}
 \alias{nextScan,MsScanList-method}
 \alias{parent,MsScanList-method}
 \alias{previousScan,MsScanList-method}
@@ -17,6 +18,8 @@
 \title{Class to handle specific scans}
 \usage{
 \S4method{show}{MsScanList}(object)
+
+\S4method{names}{MsScanList}(x)
 
 \S4method{[}{MsScanList,numeric,missing,missing}(x, i, j, ..., drop = TRUE)
 
@@ -42,6 +45,8 @@
 }
 \arguments{
 \item{object}{An MsScanList object}
+
+\item{x}{An MsScanList object}
 }
 \value{
 \code{nextScan}: An MsScanList object with the next scan
@@ -66,6 +71,8 @@ This class is a container for one or several scans from MsData object(s).
 \section{Methods (by generic)}{
 \itemize{
 \item \code{show}: Short summary of object
+
+\item \code{names}: Get the names of the scans
 
 \item \code{[}: Subset an MsList object
 
@@ -108,15 +115,21 @@ Other MSsary-classees: \code{\link{MsChromList-class}},
   \code{\link{msData,MsChromList-method}},
   \code{\link{msInfo,MsChromList-method}},
   \code{\link{msPlot,MsChromList-method}},
+  \code{\link{names,MsChromList-method}},
   \code{\link{show,MsChromList-method}};
   \code{\link{MsIonList-class}},
-  \code{\link{[,MsIonList,logical,missing,missing-method}},
-  \code{\link{[,MsIonList,numeric,missing,missing-method}},
-  \code{\link{length,MsIonList-method}},
   \code{\link{msData,MsIonList-method}},
   \code{\link{msInfo,MsIonList-method}},
   \code{\link{msPlot,MsIonList-method}},
+  \code{\link{names,MsIonList-method}},
   \code{\link{show,MsIonList-method}};
-  \code{\link{MsPeakList-class}}
+  \code{\link{MsPeakList-class}},
+  \code{\link{[,MsPeakList,logical,missing,missing-method}},
+  \code{\link{[,MsPeakList,numeric,missing,missing-method}},
+  \code{\link{msData,MsPeakList-method}},
+  \code{\link{msInfo,MsPeakList-method}},
+  \code{\link{msPlot,MsPeakList-method}},
+  \code{\link{names,MsPeakList-method}},
+  \code{\link{show,MsPeakList-method}}
 }
 

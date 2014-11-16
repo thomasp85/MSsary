@@ -7,7 +7,7 @@ output:
         css: styles.css
 vignette: >
   %\VignetteEngine{knitr::rmarkdown}
-  %\VignetteIndexEntry{Using MSGFgui}
+  %\VignetteIndexEntry{Introduction to MSsary}
   %\usepackage[utf8]{inputenc}
 ---
 
@@ -122,13 +122,13 @@ description, the MSsary version used, the name and version of extension packages
 as well as the file call used to make the modification.
 
 To load in an already created MSsary analysis, the `loadMsData()` function is
-used instead. It takes both the raw and the sary file as arguments:
+used instead. It takes the sary file as arguments:
 
 ```{r, eval=TRUE, echo=TRUE}
 saryFile <- file.path(dirname(mzMLfile), 'Shew_slice1.sary')
 rm(msData)
 
-msData <- loadMsData(mzMLfile, saryFile)
+msData <- loadMsData(saryFile)
 ```
 
 MsData objects are designed to be extremely lightweight, making it easy to have 
@@ -141,23 +141,22 @@ object.size(msData)
 ### Extracting data from MsData objects
 Once an MsData object have been created it is possible to access the underlying
 data in an easy and intuitive way. For pure unaltered MsData objects the main
-data types are scans and chromatograms.
+data types are scans, chromatograms and raw list of ions. The underlying data
+can be queried rather freely to select just the information relevant to you. 
+This is done through a family of functions that takes care of creating the 
+necessary SQL queries. The current functions are: ABOVE, BELOW, EQUALS, DIFFERS,
+IN, NOTIN, BETWEEN, OVERLAPS and OUTSIDE, and their intent is rather obvious 
+from their names. Any information available in the relevant underlying table can
+be used to finetune your query.
 
 #### Extracting scans
-The most direct way to access scans is to pass a vector of acquisition numbers,
-matching the scans you wish to extract:
+Scans can be extracted based on the information available in the header table
+(similar to the data.frame returned by the mzR header function). Not all 
+information are particularly relevant and you would probably use columns such as
+msLevel, retentionTime/seqNum, precursorScanNum etc most
 
 ```{r, eval=TRUE, echo=TRUE}
-msScans <- scans(msData, 2401:2405)
-msScans
-```
-
-Acquisition number are seldom very meaningful though, so instead it is possible
-to pass different filtering options instead, such as MS level, retention time,
-number of ions etc.
-
-```{r, eval=TRUE, echo=TRUE}
-msScans <- scans(msData, msLevels=2, retentionTime=c(400, 402))
+msScans <- scans(msData, msLevel=2, retentionTime=BETWEEN(400, 402))
 msScans
 ```
 
@@ -180,9 +179,10 @@ If you need to get the underlying data in a more standard R format, these can be
 extracted with two functions
 
 ```{r, eval=TRUE, echo=TRUE}
-msInfo(msScans)[, 1:4]               # Get metadata about the scans
+msInfo(msScans)[, 1:8]               # Get metadata about the scans
 scanRaw <- msData(msScans)           # Get scan data as a list of matrices
 head(scanRaw[[1]])
+head(msScans[[1]])                   # Equal to above - direct data extraction
 ```
 
 At last it also have a very powerful plotting function that can take all this
@@ -198,11 +198,12 @@ msPlot(msChild)
 #### Extracting chromatograms
 As with scans, it is also possible to extract data in the time dimension. The
 syntax is very much the same, and so is the returned object (though it does not
-have nextScan, parent etc. methods as they would be meaningless). By default it
-extracts the full chromatogram for level 1 scans:
+have nextScan, parent etc. methods as they would be meaningless). Constraints 
+imposed on the queries though so it is only possible to extract continous 
+intervals as it would be meaningless otherwise.
 
 ```{r, eval=TRUE, echo=TRUE}
-msChrom <- chroms(msData)
+msChrom <- chroms(msData, msLevel=1)
 class(msChrom)
 msPlot(msChrom)
 ```
@@ -213,9 +214,9 @@ chromatograms (XIC) can be created by setting m/z and either retention time or
 scan number windows.
 
 ```{r, eval=TRUE, echo=TRUE}
-mzWins <- matrix(c(400, 500, 500, 600), ncol=2, byrow=TRUE)
-rtWins <- matrix(c(300, 500, 400, 600), ncol=2, byrow=TRUE)
-msXIC <- chroms(msData, retentionTime=rtWins, mzRange=mzWins)
+rtFilter <- BETWEEN(c(300, 400), c(500, 600))
+mzFilter <- BELOW(600)
+msXIC <- chroms(msData, retentionTime=rtFilter, mz=mzFilter, msLevel=1)
 msPlot(msXIC)
 ```
 
@@ -224,7 +225,7 @@ method. Note that this extracts the full scans and thus ignores any m/z window
 used for the XIC from where they are derived.
 
 ```{r, eval=TRUE, echo=TRUE}
-msXIC <- chroms(msData, retentionTime=c(480, 510))
+msXIC <- chroms(msData, retentionTime=BETWEEN(480, 510), msLevel=1)
 msPlot(msXIC, collapse=TRUE)
 ```
 
@@ -246,7 +247,7 @@ and intensity). These are stored in an MsIonList and are often used to visualy
 instpect an area of your data
 
 ```{r, eval=TRUE, echo=TRUE}
-msIons <- ions(msData, retentionTime=c(400, 500), mzRange=c(300, 310))
+msIons <- ions(msData, retentionTime=BETWEEN(400, 500), mz=BETWEEN(300, 310), msLevel=1)
 msIons
 ```
 
@@ -281,7 +282,7 @@ will be described below:
 
 * Preprocessing of data.
 * Peak detection.
-* Grouping of peaks within a sample.
+* Linking of peaks within a sample.
 * Grouping of peaks across samples.
 
 Often these operation will be done on MS1 data, but there is no inherent 

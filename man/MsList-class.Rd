@@ -4,18 +4,30 @@
 \alias{MsList-class}
 \alias{[,MsList,logical,missing,missing-method}
 \alias{[,MsList,numeric,missing,missing-method}
+\alias{[[,MsList,numeric,missing-method}
+\alias{c,MsList-method}
 \alias{dropEmpty,MsList-method}
 \alias{isEmpty,MsList-method}
 \alias{length,MsList-method}
 \alias{msData,MsList-method}
 \alias{msInfo,MsList-method}
+\alias{names,MsList-method}
+\alias{sort,MsList-method}
 \title{Virtual class for MSsary list like objects}
 \usage{
 \S4method{length}{MsList}(x)
 
+\S4method{names}{MsList}(x)
+
 \S4method{[}{MsList,numeric,missing,missing}(x, i, j, ..., drop = TRUE)
 
 \S4method{[}{MsList,logical,missing,missing}(x, i, j, ..., drop = TRUE)
+
+\S4method{[[}{MsList,numeric,missing}(x, i, j)
+
+\S4method{c}{MsList}(x, y, ..., recursive = FALSE)
+
+\S4method{sort}{MsList}(x, decreasing = FALSE, by, ...)
 
 \S4method{isEmpty}{MsList}(object)
 
@@ -40,9 +52,17 @@ where the data was extracted.
 \itemize{
 \item \code{length}: Number of elements in the object
 
+\item \code{names}: Get the names of the elements
+
 \item \code{[}: Subset an MsList object
 
 \item \code{[}: Subset an MsList object
+
+\item \code{[[}: Extract raw data
+
+\item \code{c}: Combine multiple lists
+
+\item \code{sort}: Sort an MsList by a property
 
 \item \code{isEmpty}: See if scans are empty
 

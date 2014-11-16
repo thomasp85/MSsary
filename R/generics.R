@@ -143,6 +143,23 @@ setGeneric(
     'ions', def = function(object, ...) {standardGeneric('ions')}
 )
 
+#' Extract peaks from an object
+#' 
+#' This function allows the user to extract peaks from a range of 
+#' objects into an MsPeakList object
+#' 
+#' @param object The object to extract ions from
+#' 
+#' @param ... Aditional parameters depending on the class of @@object
+#' 
+#' @return An MsPeakList object
+#' 
+#' @export
+#' 
+setGeneric(
+    'peaks', def = function(object, ...) {standardGeneric('peaks')}
+)
+
 #' Get and set the mode of scans in an MsScanList
 #' 
 #' This function returns or sets the mode of the scans in an MsScanList, either

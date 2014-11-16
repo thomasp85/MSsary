@@ -1,5 +1,5 @@
 ################################################################################
-# TODO: 
+# TODO: Ordering of plots doesn't follow scan order
 #
 
 #' @include aaa.R
@@ -52,6 +52,17 @@ setMethod(
     'show', 'MsScanList',
     function(object) {
         cat('An MsScanList object with', length(object), 'scans\n')
+    }
+)
+#' @describeIn MsScanList Get the names of the scans
+#' 
+#' @param x An MsScanList object
+#' 
+setMethod(
+    'names', 'MsScanList',
+    function(x) {
+        n <- callNextMethod()
+        paste0(n, x@info$acquisitionNum)
     }
 )
 
@@ -123,6 +134,70 @@ setMethod(
         p <- p + facet_grid(sample ~ ., scales='free_y')
         p <- p + scale_y_continuous('Intensity') + scale_x_continuous('m/z')
         p
+    }
+)
+
+#' Get chroms with optional expansion
+#' 
+setMethod(
+    'chroms', 'MsScanList',
+    function(object, mz, expand=0) {
+        info <- msInfo(object)
+        res <- list()
+        for(i in 1:length(object)) {
+            args <- list()
+            args$object <- con(object, i, 'MsData')
+            args$retentionTime <- BETWEEN(info$retentionTime[i]-expand, info$retentionTime[i]+expand)
+            if(!missing(mz)) {
+                if(!rangeFilter(mz)) stop('mz filter must define an interval')
+                args$mz <- mz[i]
+            }
+            args$msLevel <- info$msLevel[i]
+            res[[i]] <- do.call(chroms, args)
+        }
+        do.call(c, res)
+    }
+)
+#' Get ions with optional expansion
+#' 
+setMethod(
+    'ions', 'MsScanList',
+    function(object, mz, expand=0, ...) {
+        info <- msInfo(object)
+        res <- list()
+        for(i in 1:length(object)) {
+            args <- list()
+            args$object <- con(object, i, 'MsData')
+            args$retentionTime <- BETWEEN(info$retentionTime[i]-expand, info$retentionTime[i]+expand)
+            if(!missing(mz)) {
+                if(!rangeFilter(mz)) stop('mz filter must define an interval')
+                args$mz <- mz[i]
+            }
+            args$msLevel <- info$msLevel[i]
+            res[[i]] <- do.call(ions, args)
+        }
+        do.call(c, res)
+    }
+)
+
+#' Get peaks intersecting with scan
+#' 
+setMethod(
+    'peaks', 'MsScanList',
+    function(object, parent=FALSE, ...) {
+        info <- msInfo(object)
+        res <- list()
+        for(i in 1:length(object)) {
+            if(parent) {
+                pSeqNum <- dbGetQuery(con(object, i, 'sary'), paste0('SELECT seqNum FROM header WHERE acquisitionNum == ', info$precursorScanNum[i]))$seqNum
+                if(length(pSeqNum) == 1) {
+                    res[[i]] <- peaks(con(object, i, 'MsData'), seqNum=OVERLAPS(pSeqNum), mz=OVERLAPS(info$precursorMZ[i]), msLevel=info$msLevel-1)
+                }
+            } else {
+                res[[i]] <- peaks(con(object, i, 'MsData'), seqNum=OVERLAPS(info$seqNum[i]), msLevel=info$msLevel[i])                
+            }
+        }
+        res
     }
 )
 

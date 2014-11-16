@@ -1,5 +1,8 @@
 ################################################################################
-# TODO: Automatically convert minScan and maxScan to correct index on return
+# TODO: Fix mqCpp - removeOvertimers() is called before segmentation collapse.
+#                   Double itereation in SegProc
+#                   Reimplement square rooting where relevant
+#
 
 #' Object to handle all peak detection methods
 #' 
@@ -23,7 +26,7 @@ peakMethodStore <- setRefClass(
         functions='list',
         requirements='list',
         package='list',
-        version='list'
+        packVersion='list'
     ),
     methods=list(
         initialize=function() {
@@ -50,7 +53,7 @@ peakMethodStore <- setRefClass(
         getVersion=function(name) {
             "Get the version of the package from where a function originates"
             
-            version[[name]]
+            packVersion[[name]]
         },
         testInput=function(name, scans, info) {
             "Test the provided inputs to see if they are sound and corresponds
@@ -69,7 +72,7 @@ peakMethodStore <- setRefClass(
             if(!is.null(requirements[name]$msLevel) && info$msLevel[1] != requirements[name]$msLevel) {
                 stop('MS level is ', info$msLevel[1], ', should be ', requirements[name]$msLevel)
             }
-            if(sort(info$seqNum) != info$seqNum) {
+            if(!identical(sort(info$seqNum), info$seqNum)) {
                 stop('Scans doesn\'t seem to be consecutive')
             }
             if(!is.null(requirements[name]$extraInfo)) {
@@ -92,9 +95,11 @@ peakMethodStore <- setRefClass(
             if(class(res) != 'data.frame') {
                 stop('Output should be of class data.frame')
             }
-            if(all(resultNames %in% names(res))) {
+            if(!all(resultNames %in% names(res))) {
                 stop('Output is missing columns: ', resultNames[!resultNames %in% names(res)])
             }
+            res$msLevel <- info$msLevel[1]
+            res$peak <- lapply(res$peak, serialize, connection=NULL)
             res
         },
         registerMethod=function(name, fun, req=list()) {
@@ -107,15 +112,17 @@ peakMethodStore <- setRefClass(
             if(class(requirements) != 'list') {
                 stop('Requirements must be in the form of a list')
             }
+            if(!all(c('scans', 'info') %in% names(formals(fun)))) {
+                stop('Function arguments must include \'scans\' and \'info\'')
+            }
             
             functionName <- deparse(substitute(fun))
             packageName <- sub('.*:', '', getAnywhere(functionName)$where[1])
-            packageVersion <- getVersion(packageName)
             
             functions[[name]] <<- fun
             requirements[[name]] <<- req
             package[[name]] <<- packageName
-            version[[name]] <<- packageVersion
+            packVersion[[name]] <<- as.character(packageVersion(packageName))
         }
     )
 )
@@ -210,8 +217,9 @@ massifquant <- function(scans, info, ppm, minIntensity, minScans, consecMissedLi
     )
     
     peakInd <- names(res) == 'peak'
-    resDf <- as.data.frame(res[, -peakInd])
-    peaks <- lapply(res$peak, function(x) {serialize(x, NULL)})
-    resDf$peak <- peaks
+    resDf <- as.data.frame(res[!peakInd])
+    resDf$peak <- res$peak
+    resDf$scanStart <- info$seqNum[resDf$scanStart]
+    resDf$scanEnd <- info$seqNum[resDf$scanEnd]
     resDf
 }

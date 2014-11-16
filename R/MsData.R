@@ -1,19 +1,17 @@
 ################################################################################
-# TODO: Implement R*tree for storing peaks
-#
-#       Register identification object with specific methods
+# TODO: Register identification object with specific methods
+#       Resolve querying raw data - use of header vs currentHeader
+#       Create empty MsList when criteria is not met
+#       peaks method for all relevant MsList subclasses
 #
 #       Copy method for MsData
-#
-#       Find solution on naming - should name be part of MsData or MsDataSet?
-#       If latter how should they be transferred to MsList object? Naming of the
-#       @connections list?
 #
 
 
 #' @include MsConnections.R
 #' @include tableFormats.R
 #' @include generics.R
+#' @include peakMethods.R
 #' @include aaa.R
 #' 
 NULL
@@ -66,6 +64,10 @@ setMethod(
         cat('        Sary file:', basename(con(object)$saryFile), '\n')
         cat('\n')
         cat('  Number of scans:', length(object), '\n')
+        nPeaks <- con(object)$nPeaks()
+        if(nPeaks != 0) {
+            cat('  Number of peaks:', nPeaks, '\n')
+        }
         cat('\n')
         cat('Last edit history:\n')
         cat('\n')
@@ -81,6 +83,19 @@ setMethod(
     'length', 'MsData',
     function(x) {
         con(x)$length()
+    }
+)
+
+setMethod(
+    '==', c('MsData', 'MsData'),
+    function(e1, e2) {
+        con(e1) == con(e2)
+    }
+)
+setMethod(
+    '!=', c('MsData', 'MsData'),
+    function(e1, e2) {
+        !(e1 == e2)
     }
 )
 
@@ -109,15 +124,8 @@ setMethod(
 #' 
 setMethod(
     'scans', 'MsData',
-    function(object, id, ...) {
-        if(length(list(...)) != 0) {
-            acqNum <- getAcqNum(con(object), ...)
-            if(!missing(id)) {
-                acqNum <- id[id %in% acqNum]
-            }
-        } else {
-            acqNum <- id
-        }
+    function(object, ...) {
+        acqNum <- unlist(getAcqNum(con(object), ...))
         if(length(acqNum) == 0) {
             stop('No scans match criteria')
         }
@@ -128,7 +136,7 @@ setMethod(
         mapping <- cbind(mapping, matrix(isCentroided(scData), dimnames = list(NULL, 'mode')))
         scData <- do.call(rbind, scData)
         colnames(scData) <- c('mz', 'intensity')
-        new('MsScanList', connections=list(con(object)), info=scInfo, data=scData, mapping=mapping)
+        new('MsScanList', connections=list(object), info=scInfo, data=scData, mapping=mapping)
     }
 )
 
@@ -142,50 +150,30 @@ setMethod(
 #' 
 setMethod(
     'chroms', 'MsData',
-    function(object, seqNum, retentionTime, mzRange, msLevel = 1) {
-        #browser()
-        if(missing(seqNum)) {
-            if(missing(retentionTime)) {
-                acqNum <- list(getAcqNum(con(object), msLevels = msLevel))
-            } else {
-                if(class(retentionTime) != 'matrix') {
-                    retentionTime <- matrix(retentionTime, ncol=2, byrow=TRUE)
-                }
-                acqNum <- lapply(1:nrow(retentionTime), function(i) {
-                    getAcqNum(con(object), retentionTime=retentionTime[i,], msLevels=msLevel)
-                })
-            }
-        } else {
-            if(!missing(retentionTime)) {
-                warning('retention time window ignored')
-            }
-            if(class(seqNum) != 'matrix') {
-                seqNum <- matrix(seqNum, ncol=2, byrow=TRUE)
-            }
-            acqNum <- lapply(1:nrow(seqNum), function(i) {
-                getAcqNum(con(object), seqNum=seqNum[i,], msLevels=msLevel)
-            })
-        }
-        if(missing(mzRange)) {
+    function(object, ..., mz) {
+        args <- list(...)
+        acqNum <- getContAcqNum(con(object), ...)
+        msLevels <- toFilter(args$msLevel)$data
+        msLevels <- rep(msLevels, length.out=length(acqNum))
+        if(missing(mz)) {
             scanNums <- sort(unique(do.call('c', acqNum)))
             data <- dbGetQuery(con(object)$sary(), paste0('SELECT acquisitionNum, retentionTime, totIonCurrent, basePeakIntensity FROM header WHERE acquisitionNum IN (', paste(scanNums, collapse=', '), ')'))
-            #browser()
             data <- lapply(acqNum, function(x) {data[data$acquisitionNum %in% x,]})
         } else {
-            if(class(mzRange) != 'matrix') {
-                mzRange <- matrix(mzRange, ncol=2, byrow=TRUE)
+            if(!rangeFilter(mz)) {
+                stop('mz must specifiy an interval: Use either \'BETWEEN\', \'ABOVE\' or \'BELOW\'')
             }
-            if(length(acqNum) > nrow(mzRange)) {
-                mzRange <- mzRange[rep(1:nrow(mzRange), length.out=length(acqNum)), ]
-            } else if(length(acqNum) < nrow(mzRange)) {
-                acqNum <- rep(acqNum, length.out=nrow(mzRange))
+            mzFunc <- toFunction(mz)
+            if(length(acqNum) > length(mzFunc)) {
+                mzFunc <- mzFunc[rep(1:length(mzFunc), length.out=length(acqNum))]
+            } else if(length(acqNum) < length(mzFunc)) {
+                acqNum <- rep(acqNum, length.out=length(mzFunc))
             }
-            data <- con(object)$extractIC(acqNum, mzRange)
+            data <- con(object)$extractIC(acqNum, mzFunc)
         }
         info <- lapply(1:length(data), function(i) {
             data.frame(
-                name=NA, 
-                msLevel=msLevel,
+                msLevel=msLevels[i],
                 nScan=nrow(data[[i]]), 
                 maxTIC=max(data[[i]]$totIonCurrent), 
                 maxBPC=max(data[[i]]$basePeakIntensity), 
@@ -194,16 +182,17 @@ setMethod(
             )
         })
         info <- do.call(rbind, info)
-        if(!missing(mzRange)) {
+        if(!missing(mz)) {
+            mzRange <- toRange(mz)
+            mzRange <- mzRange[rep(1:nrow(mzRange), length.out=nrow(info)), , drop=FALSE]
             colnames(mzRange) <- c('minMZ', 'maxMZ')
             info <- cbind(info, mzRange)
         }
-        info$name <- createChromNames(object, info)
         mapping <- getListMapping(data, 1)
         data <- as.matrix(do.call(rbind, data))
         cNames <- c('acquisitionNum', 'retentionTime', 'TIC', 'BPC')
         colnames(data) <- cNames
-        new('MsChromList', connections=list(con(object)), info=info, data=data, mapping=mapping)
+        new('MsChromList', connections=list(object), info=info, data=data, mapping=mapping)
     }
 )
 
@@ -211,50 +200,57 @@ setMethod(
 #' 
 setMethod(
     'ions', 'MsData',
-    function(object, seqNum, retentionTime, mzRange, msLevel = 1, SIMPLIFY=TRUE) {
-        if(missing(seqNum)) {
-            if(missing(retentionTime)) {
-                acqNum <- list(getAcqNum(con(object), msLevels = msLevel))
-            } else {
-                if(class(retentionTime) != 'matrix') {
-                    retentionTime <- matrix(retentionTime, ncol=2, byrow=TRUE)
-                }
-                acqNum <- lapply(1:nrow(retentionTime), function(i) {
-                    getAcqNum(con(object), retentionTime=retentionTime[i,], msLevels=msLevel)
-                })
-            }
+    function(object, ..., mz) {
+        args <- list(...)
+        acqNum <- getContAcqNum(con(object), ...)
+        msLevels <- toFilter(args$msLevel)$data
+        msLevels <- rep(msLevels, length.out=length(acqNum))
+        
+        if(missing(mz)) {
+            mzFunc <- NULL
         } else {
-            if(!missing(retentionTime)) {
-                warning('retention time window ignored')
+            if(!rangeFilter(mz)) {
+                stop('mz must specifiy an interval: Use either \'BETWEEN\', \'ABOVE\' or \'BELOW\'')
             }
-            if(class(seqNum) != 'matrix') {
-                seqNum <- matrix(seqNum, ncol=2, byrow=TRUE)
+            mzFunc <- toFunction(mz)
+            if(length(acqNum) > length(mzFunc)) {
+                mzFunc <- mzFunc[rep(1:length(mzFunc), length.out=length(acqNum))]
+            } else if(length(acqNum) < length(mzFunc)) {
+                acqNum <- rep(acqNum, length.out=length(mzFunc))
             }
-            acqNum <- lapply(1:nrow(seqNum), function(i) {
-                getAcqNum(con(object), seqNum=seqNum[i,], msLevels=msLevel)
-            })
         }
-        if(missing(mzRange)) mzRange <- NULL
-        ions <- con(object)$extractIons(acqNum, mzRange)
-        ions <- lapply(ions, function(x) {
-            new(
-                'MsIonList',
-                connections=list(con(object)),
-                info=data.frame(
-                    msLevel=msLevel,
-                    minRT=min(x[, 'retentionTime']), 
-                    maxRT=max(x[, 'retentionTime']), 
-                    minMZ=min(x[, 'mz']),
-                    maxMZ=max(x[, 'mz']),
-                    minINT=min(x[, 'intensity']),
-                    maxINT=max(x[, 'intensity'])
-                ),
-                data=x,
-                mapping=matrix(c(1, nrow(x), 1), nrow=1, dimnames = list(NULL, c('start', 'end', 'conIndex')))
+        data <- con(object)$extractIons(acqNum, mzFunc)
+        info <- mapply(function(x, msLevel) {
+            data.frame(
+                msLevel=msLevel,
+                minRT=min(x[, 'retentionTime']), 
+                maxRT=max(x[, 'retentionTime']), 
+                minMZ=min(x[, 'mz']),
+                maxMZ=max(x[, 'mz']),
+                minINT=min(x[, 'intensity']),
+                maxINT=max(x[, 'intensity'])
             )
-        })
-        if(SIMPLIFY && length(ions) == 1) ions <- ions[[1]]
-        ions
+        }, x=data, msLevel=msLevels, SIMPLIFY=FALSE)
+        info <- do.call(rbind, info)
+        mapping <- getListMapping(data, 1)
+        data <- do.call(rbind, data)
+        new('MsIonList', connections=list(object), info=info, data=data, mapping=mapping)
+    }
+)
+
+#' Extrack peaks from an MsData object
+#' 
+setMethod(
+    'peaks', 'MsData',
+    function(object, ...) {
+        ids <- unlist(getPeakIds(con(object), ...))
+        info <- con(object)$getPeaks(ids)
+        data <- lapply(info$peak, matrix, ncol=2, byrow=TRUE)
+        info$peak <- NULL
+        mapping <- getListMapping(data, 1)
+        data <- do.call(rbind, data)
+        colnames(data) <- c('retentionTime', 'intensity')
+        new('MsPeakList', connections=list(object), info=info, data=data, mapping=mapping)
     }
 )
 
@@ -262,8 +258,35 @@ setMethod(
 #' 
 setMethod(
     'detectPeaks', 'MsData',
-    function(object, method, msLevel, ...) {
+    function(object, method, ...) {
+        arguments <- list(...)
+        dataSubset <- names(arguments) %in% names(formals(getContAcqNum))
+        acqNum <- unlist(do.call(getContAcqNum, c(con=con(object), arguments[dataSubset])))
         
+        arguments <- arguments[!dataSubset]
+        arguments$name <- method
+        arguments$scans <- con(object)$getScans(acqNum)
+        arguments$info <- con(object)$getHeader(acqNum)
+        
+        peaks <- do.call(peakMethods$useMethod, arguments)
+        funcCall <- expand.call(call=sys.call(-1), expand.dots = TRUE)
+        prevID <- dbGetQuery(con(object)$sary(), 'SELECT IFNULL(MAX(rowid), 0) AS max FROM peakInfo')$max
+        con(object)$addData('peakInfo', peaks[, c('msLevel', 'length', 'mzMean', 'maxHeight', 'area', 'peak')])
+        ids <- dbGetQuery(con(object)$sary(), paste0('SELECT rowid AS id FROM peakInfo WHERE rowid > ', prevID))$id
+        con(object)$addData('peakLoc', data.frame(peakID=ids, peaks[, c('scanStart', 'scanEnd', 'mzMin', 'mzMax')]))
+        con(object)$addData(
+            'history', 
+            data.frame(
+                time = as.character(Sys.time()),
+                operation = 'Peaks detected',
+                MSsary_version = as.character(packageVersion('MSsary')),
+                call = callToString(funcCall),
+                augPackage = peakMethods$getPackage(method),
+                augPackVersion = peakMethods$getVersion(method),
+                stringsAsFactors=FALSE
+            )
+        )
+        invisible(TRUE)
     }
 )
 
@@ -285,13 +308,22 @@ setMethod(
 #' file <- 'test'
 #' msdata <- createMsData(file)
 #' 
-#' @importFrom tools file_path_sans_ext
+#' @importFrom tools file_path_sans_ext file_path_as_absolute
 #' @importFrom mzR openMSfile close header
 #' 
 #' @export
 #' 
-createMsData <- function(rawFile) {
-    dbFile <- paste0(file_path_sans_ext(rawFile,compression = T), '.sary')
+createMsData <- function(rawFile, saryName, force=FALSE) {
+    if(missing(saryName)) {
+        dbFile <- paste0(file_path_sans_ext(rawFile,compression = T), '.sary')
+    } else {
+        dbFile <- file.path(dirname(rawFile), paste0(saryName, '.sary'))
+    }
+    if(force) {
+        if(unlink(dbFile) == 1) {
+            stop('Cannot remove ', dbFile)
+        }
+    }
     if(file.exists(dbFile)) {
         stop('Sary file already exists at: ', dbFile)
     }
@@ -308,20 +340,24 @@ createMsData <- function(rawFile) {
     connection$addData('header', headerInfo)
     
     connection$addTable('history', historyTableFormat)
-    funcCall <- sys.call(0)
+    funcCall <- match.call()
     connection$addData(
         'history', 
         data.frame(
             time = as.character(Sys.time()),
             operation = 'Sary created',
-            MSsary_version = .MSsary_version,
-            call = deparse(funcCall)
+            MSsary_version = as.character(packageVersion('MSsary')),
+            call = callToString(funcCall),
+            stringsAsFactors=FALSE
         )
     )
+    connection$addTable('mzR', 'location TEXT NOT NULL')
+    connection$addData('mzR', data.frame(location=file_path_as_absolute(rawFile)))
     
     connection$addTable('scans', scanTableFormat)
     
-    connection$addTable('peaks', peakTableFormat)
+    connection$addTable('peakInfo', peakTableFormat)
+    connection$addTable('peakLoc', peakRtree, rtree=TRUE)
     
     dbGetQuery(
         connection$sary(), 
@@ -362,7 +398,16 @@ createMsData <- function(rawFile) {
 #' 
 #' @export
 #' 
-loadMsData <- function(rawFile, saryFile, testIntegrity=TRUE, testSize=10) {
+loadMsData <- function(saryFile, rawFile, testIntegrity=TRUE, testSize=10) {
+    if(missing(rawFile)) {
+        rawFile <- getMzrPath(saryFile)
+        if(!file.exists(rawFile)) {
+            rawFile <- file.path(dirname(saryFile), basename(rawFile))
+            if(!file.exists(rawFile)) {
+                stop('Cannot infer raw data location')
+            }
+        }
+    }
     connection <- MsConnections(rawFile, saryFile)
     
     if(!connection$verify()) {

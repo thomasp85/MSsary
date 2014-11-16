@@ -7,10 +7,13 @@
 \alias{msData,MsChromList-method}
 \alias{msInfo,MsChromList-method}
 \alias{msPlot,MsChromList-method}
+\alias{names,MsChromList-method}
 \alias{show,MsChromList-method}
 \title{Class to handle extracted ion chromatograms}
 \usage{
 \S4method{show}{MsChromList}(object)
+
+\S4method{names}{MsChromList}(x)
 
 \S4method{[}{MsChromList,numeric,missing,missing}(x, i, j, ..., drop = TRUE)
 
@@ -32,6 +35,8 @@
 
 \item{collapse}{Should 'BPC' and 'TIC' be overlayed or on separate plots,
 TRUE means overlayed.}
+
+\item{x}{An MsChromList object}
 }
 \value{
 \code{msInfo}: A data.frame with one row containing information
@@ -46,6 +51,8 @@ This class is a container for one or several XIC from MsData object(s).
 \section{Methods (by generic)}{
 \itemize{
 \item \code{show}: Short summary of object
+
+\item \code{names}: Get the names of the scans
 
 \item \code{[}: Subset an MsList object
 
@@ -71,14 +78,19 @@ This class is a container for one or several XIC from MsData object(s).
 }}
 \seealso{
 Other MSsary-classees: \code{\link{MsIonList-class}},
-  \code{\link{[,MsIonList,logical,missing,missing-method}},
-  \code{\link{[,MsIonList,numeric,missing,missing-method}},
-  \code{\link{length,MsIonList-method}},
   \code{\link{msData,MsIonList-method}},
   \code{\link{msInfo,MsIonList-method}},
   \code{\link{msPlot,MsIonList-method}},
+  \code{\link{names,MsIonList-method}},
   \code{\link{show,MsIonList-method}};
-  \code{\link{MsPeakList-class}};
+  \code{\link{MsPeakList-class}},
+  \code{\link{[,MsPeakList,logical,missing,missing-method}},
+  \code{\link{[,MsPeakList,numeric,missing,missing-method}},
+  \code{\link{msData,MsPeakList-method}},
+  \code{\link{msInfo,MsPeakList-method}},
+  \code{\link{msPlot,MsPeakList-method}},
+  \code{\link{names,MsPeakList-method}},
+  \code{\link{show,MsPeakList-method}};
   \code{\link{MsScanList-class}},
   \code{\link{[,MsScanList,logical,missing,missing-method}},
   \code{\link{[,MsScanList,numeric,missing,missing-method}},
@@ -86,6 +98,7 @@ Other MSsary-classees: \code{\link{MsIonList-class}},
   \code{\link{msData,MsScanList-method}},
   \code{\link{msInfo,MsScanList-method}},
   \code{\link{msPlot,MsScanList-method}},
+  \code{\link{names,MsScanList-method}},
   \code{\link{nextScan,MsScanList-method}},
   \code{\link{parent,MsScanList-method}},
   \code{\link{previousScan,MsScanList-method}},

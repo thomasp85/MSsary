@@ -7,6 +7,8 @@ historyTableFormat <- c(
     'augPackVersion     TEXT DEFAULT NULL'
 )
 
+# MsData
+
 headerTableFormat <- c(
     'seqNum                     INTEGER NOT NULL UNIQUE',
     'acquisitionNum             INTEGER PRIMARY KEY',
@@ -44,14 +46,66 @@ scanTableFormat <- c(
 )
 
 peakTableFormat <- c(
-    'peakID     INTEGER PRIMARY KEY',
-    'scanStart  INTEGER REFERENCES header(seqNum)',
-    'scanEnd    INTEGER REFERENCES header(seqNum)',
+    'peakID     INTEGER PRIMARY KEY AUTOINCREMENT',
+    'msLevel    INTEGER NOT NULL',
     'length     INTEGER NOT NULL',
-    'mzMin      REAL NOT NULL',
     'mzMean     REAL NOT NULL',
-    'mzMax      REAL NOT NULL',
     'maxHeight  REAL NOT NULL',
     'area       REAL NOT NULL',
     'peak       BLOB NOT NULL'
+)
+
+peakRtree <- c(
+    'peakID',
+    'scanStart',
+    'scanEnd',
+    'mzMin',
+    'mzMax'
+)
+
+linkTableFormat <- c(
+    'linkID     INTEGER PRIMARY KEY AUTOINCREMENT',
+    'linkType   TEXT NOT NULL'
+)
+
+linkMemberFormat <- c(
+    'linkID             INTEGER REFERENCES linkTable',
+    'peakID             INTEGER REFERENCES peakInfo',
+    'linkDescription    TEXT DEFAULT \'\''
+)
+
+# MsDataSet
+
+memberTableFormat <- c(
+    'memberID           INTEGER PRIMARY KEY AUTOINCREMENT',
+    'saryLocation       TEXT NOT NULL',
+    'memberName         TEXT NOT NULL',
+    'referenceSample    INTEGER NOT NULL CHECK(referenceSample IN (0, 1)) DEFAULT 0'
+)
+
+groupTableFormat <- c(
+    'groupID    INTEGER PRIMARY KEY AUTOINCREMENT',
+    'msLevel    INTEGER NOT NULL',
+    'nPeaks     INTEGER NOT NULL',
+    'nMembers   INTEGER NOT NULL'
+)
+
+groupRtree <- c(
+    'groupID',
+    'rtStart',
+    'rtEnd',
+    'mzMin',
+    'mzMax'
+)
+
+groupMemberFormat <- c(
+    'groupID    INTEGER REFERENCES groupTable',
+    'memberID   INTEGER REFERENCES members',
+    'peakID     INTEGER NOT NULL'
+)
+
+rtCorTableFormat <- c(
+    'memberID       INTEGER REFERENCES members',
+    'scanNum        INTEGER NOT NULL',
+    'retentionTime  REAL NOT NULL'
 )

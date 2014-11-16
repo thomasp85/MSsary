@@ -1,5 +1,7 @@
 // Massifquant
 
+#include <string.h>
+
 //MASSIFQUANT
 #include "massifquant/OpOverload.h"
 #include "massifquant/Tracker.h"
@@ -30,18 +32,13 @@ List mqCpp(List scans, NumericVector scantime, double minIntensity,
     double mzq = dkeep.getInitMZS2();       // MZ variance
     double mzr =  sqrt(mzq);                // MZ std. dev
     double ir = dkeep.getInitIS();          // Intensity std. dev
-    double * pscantime = scantime.begin();
+    const vector<double> retentionTime = as< vector<double> >(scantime);
 
     // Model breaks down otherwise
     if (mzq == 0) {
         mzq = 1e-6;
         mzr = sqrt(mzq);
     }
-
-    // Show the progress please
-    Rprintf("\n Detecting Kalman ROI's ... \n percent finished: ");
-    R_FlushConsole();
-    R_ProcessEvents();
     
     // Initialize tracker manager
     TrMgr busybody(totalScanNums, minIntensity,
@@ -53,20 +50,24 @@ List mqCpp(List scans, NumericVector scantime, double minIntensity,
     busybody.setDataScan(mzScan, intenScan);
     busybody.initTrackers(iq, mzq, ir, mzr, totalScanNums);
     
-    
+    // Set up progress bar
+    string progress(50, ' ');
+    string header = "Finding peaks    ";
     // Begin feature finding - itereate backwards
     double progCount = 0;
     double maxScanNums = double(totalScanNums);
-    double progThresh = 10;
+    double progThresh = 1;
     for (int k = totalScanNums - 1; k >= 1; k--) {
         //progress
         double perc  = (progCount/totalScanNums) * 100;
         if (perc > progThresh) {
-            Rprintf(" %d  ", int(perc));
+            progress[int(perc)/2] = '=';
+            Rcout << "\r" + header + " |" + progress + "| " + to_string(int(perc)) + "%  ";
             R_FlushConsole();
-            R_ProcessEvents();
-            progThresh += 10;
+            progThresh += 1;
         }
+        R_ProcessEvents();
+        
         busybody.setCurrScanIdx(k);
         dkeep.getScan(k, mzScan, intenScan);
         busybody.predictScan(mzScan, intenScan);
@@ -77,17 +78,15 @@ List mqCpp(List scans, NumericVector scantime, double minIntensity,
         progCount++;
     }
     busybody.removeOvertimers();
-
-    Rprintf(" %d\n", 100);
-    R_FlushConsole();
-    R_ProcessEvents();
     
     // Include segmentation correction if specified
+    string footer = "";
     if (segs) {
         SegProc sproc(busybody.getPicCounts());
         sproc.groupSegments(busybody);
-        sproc.collapseSubsets();
-        sproc.solderSegs(busybody);
+        sproc.splitToGroups();
+        vector<int> stats = sproc.collapseGroups(busybody);
+        footer = footer + "\n" + to_string(stats[0]) + " features collapsed to " + to_string(stats[1]);
     }
     
     // Create return value stores
@@ -104,7 +103,7 @@ List mqCpp(List scans, NumericVector scantime, double minIntensity,
     
     // Iterate over trackers and extract features
     for (int i=0;i<busybody.getPicCounts();i++) {
-        feature featInfo = busybody.iterOverFeatures(i, pscantime);
+        feature featInfo = busybody.iterOverFeatures(i, retentionTime);
 
         mzRes[i]  = featInfo.mz;
         mzminRes[i] = featInfo.mzmin;
@@ -116,5 +115,6 @@ List mqCpp(List scans, NumericVector scantime, double minIntensity,
         maxintRes[i] = featInfo.maxint;
         peak[i] = NumericVector(featInfo.ions.begin(), featInfo.ions.end());
     }
+    Rcout << "\rDone              |" + string(50, '=') + "| 100%  " + footer << endl;
     return List::create(Named("mzMean")=mzRes, Named("mzMin")=mzminRes, Named("mzMax")=mzmaxRes, Named("length")=lengthRes, Named("scanStart")=scminRes, Named("scanEnd")=scmaxRes, Named("area")=intensityRes, Named("maxHeight")=maxintRes, Named("peak")=peak);
 }

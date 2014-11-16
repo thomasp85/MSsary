@@ -1,3 +1,13 @@
+Version 0.0.7
+________________________________________________________________________________
+* Fully implemented MsPeakList with 2d and 3d plot
+* Added filter family of functions to abstract sql queries
+* Added limit familiy of functions to limit the number returned from queries
+* Added MsDataSet class to handle a collection of MsData objects
+* All MsList subclasses now have scans, chroms, ions and peaks methods
+* MsList now contains MsData objects instead of MsConnections
+* names method for MsList dynamically creates unique names
+
 Version 0.0.6
 ________________________________________________________________________________
 * Added peakMethodStore class to handle peak detection algorithms

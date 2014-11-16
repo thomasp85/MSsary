@@ -3,7 +3,7 @@
 \alias{createMsData}
 \title{Create an MsData object from a raw MS data file}
 \usage{
-createMsData(rawFile)
+createMsData(rawFile, saryName, force = FALSE)
 }
 \arguments{
 \item{rawFile}{The path to an mzR-compliant MS data file}

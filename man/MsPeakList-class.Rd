@@ -2,10 +2,61 @@
 \docType{class}
 \name{MsPeakList-class}
 \alias{MsPeakList-class}
+\alias{[,MsPeakList,logical,missing,missing-method}
+\alias{[,MsPeakList,numeric,missing,missing-method}
+\alias{msData,MsPeakList-method}
+\alias{msInfo,MsPeakList-method}
+\alias{msPlot,MsPeakList-method}
+\alias{names,MsPeakList-method}
+\alias{show,MsPeakList-method}
 \title{Class to handle detected peaks}
+\usage{
+\S4method{show}{MsPeakList}(object)
+
+\S4method{names}{MsPeakList}(x)
+
+\S4method{[}{MsPeakList,numeric,missing,missing}(x, i, j, ..., drop = TRUE)
+
+\S4method{[}{MsPeakList,logical,missing,missing}(x, i, j, ..., drop = TRUE)
+
+\S4method{msPlot}{MsPeakList}(object, type = "2d", collapse = length(object)
+  > 12, ...)
+
+\S4method{msInfo}{MsPeakList}(object)
+
+\S4method{msData}{MsPeakList}(object)
+}
+\arguments{
+\item{object}{An MsPeakList object}
+
+\item{x}{An MsPeakList object}
+}
+\value{
+\code{msInfo}: A data.frame with one row containing information
+about the scan
+
+\code{msData}: A list of matrices with m/z values in the first
+column and intensity in the second
+}
 \description{
 This class is a container for one or several peaks from MsData object(s).
 }
+\section{Methods (by generic)}{
+\itemize{
+\item \code{show}: Short summary of object
+
+\item \code{names}: Get the names of the scans
+
+\item \code{[}: Subset an MsList object
+
+\item \code{[}: Subset an MsList object
+
+\item \code{msPlot}: Create a plot
+
+\item \code{msInfo}: Get information about the scan
+
+\item \code{msData}: Get the scan data
+}}
 \section{Slots}{
 
 \describe{
@@ -25,14 +76,13 @@ Other MSsary-classees: \code{\link{MsChromList-class}},
   \code{\link{msData,MsChromList-method}},
   \code{\link{msInfo,MsChromList-method}},
   \code{\link{msPlot,MsChromList-method}},
+  \code{\link{names,MsChromList-method}},
   \code{\link{show,MsChromList-method}};
   \code{\link{MsIonList-class}},
-  \code{\link{[,MsIonList,logical,missing,missing-method}},
-  \code{\link{[,MsIonList,numeric,missing,missing-method}},
-  \code{\link{length,MsIonList-method}},
   \code{\link{msData,MsIonList-method}},
   \code{\link{msInfo,MsIonList-method}},
   \code{\link{msPlot,MsIonList-method}},
+  \code{\link{names,MsIonList-method}},
   \code{\link{show,MsIonList-method}};
   \code{\link{MsScanList-class}},
   \code{\link{[,MsScanList,logical,missing,missing-method}},
@@ -41,6 +91,7 @@ Other MSsary-classees: \code{\link{MsChromList-class}},
   \code{\link{msData,MsScanList-method}},
   \code{\link{msInfo,MsScanList-method}},
   \code{\link{msPlot,MsScanList-method}},
+  \code{\link{names,MsScanList-method}},
   \code{\link{nextScan,MsScanList-method}},
   \code{\link{parent,MsScanList-method}},
   \code{\link{previousScan,MsScanList-method}},

@@ -1,0 +1,72 @@
+---
+title: "Extending MSsary"
+author: "Thomas Lin Pedersen"
+date: "November 5th 2014"
+output: 
+    rmarkdown::html_vignette:
+        css: styles.css
+vignette: >
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteIndexEntry{Extending MSsary}
+  %\usepackage[utf8]{inputenc}
+---
+
+* * *
+
+## Introduction
+
+MSsary was created with an aim to please both users and developers. If you are
+reading this I assume that you fall comfortably into the latter category. The 
+strategy with MSsary has been to create a framework so compelling that people
+will want to implement the next best algorithm in it, so while the package ships
+with a range of algorithms to get the user started, the hope is that with time 
+algorithms will be ported from other open source project as well as developed
+from the ground up. To support this MSsary has defined a very simple system for
+plugging in new algorithms in the framework that frees developers from thinking 
+about interfacing with the underlying sqlite architecture and focus on working
+with the data of their interest. To underline the commitment to extensibility in
+MSsary all the internal algorithms are also implemented as extensions. At 
+present the following parts of MSsary are open to extensions:
+
+* Preprocessing of scans e.g. centroiding, filtering, recalibration
+* Detection of chromatographic peaks
+* Linking of peaks e.g. isotope and adduct detection, label detection
+* Grouping of peaks across samples
+
+Furthermore there is the possibility to augment the metadata available for the
+different main data types, such as assigning a quality score to all scans, or 
+calculate parameters for a gaussian fit to a peak.
+
+In the following the general mechanism for extending MSsary with your own 
+package will be described and all specific extensions from the above list will
+be adressed in detail.
+
+## The extension framework
+
+In very general terms all types of algorithms are handled by their own reference
+class object that takes care of checking input, output, method conformity etc.
+These objects are also responsible for registering new methods. Usually it is
+advisable to use a package as a container for new algorithms, as it makes it
+possible for MSsary to keep track of version history of the algorithms etc.
+Assuming that your new algorithm is distributed in a package, the registering 
+should be done in `onLoad()`. Below is an example of how massifquant is 
+registered:
+
+```{r, eval=FALSE}
+.onLoad <- function(libname, pkgname) {
+    peakMethods$registerMethod(
+        name='massifquant', 
+        fun=massifquant, 
+        req=list(mode='centroid'))
+}
+```
+
+peakMethods is the reference class object that takes care of handling all
+peak detection algorithms. The registerMethod method is used for registering new
+peak detection algorithms and takes three parameters: *name* is the name of the 
+algorithm to be used internally, *fun* is the actual function from your package
+and req is a list of requirements for the input that should be checked before 
+running the algorithm. Each type of algorithm have different types of 
+requirements that can be set as well as different specifications for the 
+parameters of fun. These will be discussed below under their respective 
+sections.

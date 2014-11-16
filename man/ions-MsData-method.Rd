@@ -4,8 +4,7 @@
 \alias{ions,MsData-method}
 \title{Extract ions from an MsData object}
 \usage{
-\S4method{ions}{MsData}(object, seqNum, retentionTime, mzRange, msLevel = 1,
-  SIMPLIFY = TRUE)
+\S4method{ions}{MsData}(object, ..., mz)
 }
 \description{
 Extract ions from an MsData object

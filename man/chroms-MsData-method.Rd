@@ -4,7 +4,7 @@
 \alias{chroms,MsData-method}
 \title{Extract chromatograms from an MsData object}
 \usage{
-\S4method{chroms}{MsData}(object, seqNum, retentionTime, mzRange, msLevel = 1)
+\S4method{chroms}{MsData}(object, ..., mz)
 }
 \description{
 This function is used to get chromatographic data from an MsData object. If

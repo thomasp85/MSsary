@@ -2,22 +2,16 @@
 \docType{class}
 \name{MsIonList-class}
 \alias{MsIonList-class}
-\alias{[,MsIonList,logical,missing,missing-method}
-\alias{[,MsIonList,numeric,missing,missing-method}
-\alias{length,MsIonList-method}
 \alias{msData,MsIonList-method}
 \alias{msInfo,MsIonList-method}
 \alias{msPlot,MsIonList-method}
+\alias{names,MsIonList-method}
 \alias{show,MsIonList-method}
 \title{Class to handle raw ion reads}
 \usage{
 \S4method{show}{MsIonList}(object)
 
-\S4method{length}{MsIonList}(x)
-
-\S4method{[}{MsIonList,numeric,missing,missing}(x, i, j, ..., drop = TRUE)
-
-\S4method{[}{MsIonList,logical,missing,missing}(x, i, j, ..., drop = TRUE)
+\S4method{names}{MsIonList}(x)
 
 \S4method{msPlot}{MsIonList}(object, type = "2d", simple = FALSE,
   precursors = !simple, ...)
@@ -48,11 +42,7 @@ Unlike other MsList subclasses this class can only contain one slice.
 \itemize{
 \item \code{show}: Short summary of object
 
-\item \code{length}: The number of ions
-
-\item \code{[}: Subset an MsList object
-
-\item \code{[}: Subset an MsList object
+\item \code{names}: Get the names of the scans
 
 \item \code{msPlot}: Create a plot
 
@@ -79,8 +69,16 @@ Other MSsary-classees: \code{\link{MsChromList-class}},
   \code{\link{msData,MsChromList-method}},
   \code{\link{msInfo,MsChromList-method}},
   \code{\link{msPlot,MsChromList-method}},
+  \code{\link{names,MsChromList-method}},
   \code{\link{show,MsChromList-method}};
-  \code{\link{MsPeakList-class}};
+  \code{\link{MsPeakList-class}},
+  \code{\link{[,MsPeakList,logical,missing,missing-method}},
+  \code{\link{[,MsPeakList,numeric,missing,missing-method}},
+  \code{\link{msData,MsPeakList-method}},
+  \code{\link{msInfo,MsPeakList-method}},
+  \code{\link{msPlot,MsPeakList-method}},
+  \code{\link{names,MsPeakList-method}},
+  \code{\link{show,MsPeakList-method}};
   \code{\link{MsScanList-class}},
   \code{\link{[,MsScanList,logical,missing,missing-method}},
   \code{\link{[,MsScanList,numeric,missing,missing-method}},
@@ -88,6 +86,7 @@ Other MSsary-classees: \code{\link{MsChromList-class}},
   \code{\link{msData,MsScanList-method}},
   \code{\link{msInfo,MsScanList-method}},
   \code{\link{msPlot,MsScanList-method}},
+  \code{\link{names,MsScanList-method}},
   \code{\link{nextScan,MsScanList-method}},
   \code{\link{parent,MsScanList-method}},
   \code{\link{previousScan,MsScanList-method}},

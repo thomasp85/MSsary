@@ -1,5 +1,5 @@
 ################################################################################
-# TODO: ions function for MsChromList
+# TODO: 
 #
 
 #' @include aaa.R
@@ -40,6 +40,21 @@ setMethod(
         cat('An MsChromList object with', length(object), 'chromatograms\n')
     }
 )
+#' @describeIn MsChromList Get the names of the scans
+#' 
+#' @param x An MsChromList object
+#' 
+setMethod(
+    'names', 'MsChromList',
+    function(x) {
+        n <- callNextMethod()
+        n <- paste0(n, x@info$msLevel, ', ', floor(x@info$minRT), '-', ceiling(x@info$maxRT))
+        if(!is.null(x@info$minMZ)) {
+            n <- paste0(n, ', ', floor(x@info$minMZ), '-', ceiling(x@info$maxMZ))
+        }
+        n
+    }
+)
 
 #' @describeIn MsChromList Subset an MsList object
 #' 
@@ -71,7 +86,7 @@ setMethod(
             warning('Empty chromatograms removed')
         }
         chromIndex <- getElementIndex(object@mapping)
-        meltData <- data.frame(chrom=msInfo(object)$name[chromIndex], object@data)
+        meltData <- data.frame(chrom=names(object)[chromIndex], object@data)
         meltData <- melt(meltData, id.vars=1:3, variable.name='type', value.name='intensity')
         meltData
     }
@@ -112,16 +127,49 @@ setMethod(
     function(object, ...) {
         chroms <- msData(object)
         lapply(1:length(chroms), function(i) {
-            con <- con(object, i)
-            acqNum <- chroms[[i]][, 'acquisitionNum']
-            scans <- con$getScans(acqNum)
-            info <- dbGetQuery(con$sary(), paste0('SELECT * FROM header WHERE acquisitionNum IN (', paste(acqNum, collapse=', '), ')'))
-            mapping <- getListMapping(scans, 1)
-            mapping <- cbind(mapping, matrix(isCentroided(scans), dimnames = list(NULL, 'mode')))
-            scans <- do.call(rbind, scans)
-            colnames(scans) <- c('mz', 'intensity')
-            new('MsScanList', connections=list(con), info=info, data=scans, mapping=mapping)
+            con <- con(object, i, 'MsData')
+            scans(con, acquisitionNum=IN(chroms[[i]][, 'acquisitionNum']))
         })
+    }
+)
+#' Extract ions from the EIC
+#' 
+setMethod(
+    'ions', 'MsChromList',
+    function(object, ...) {
+        info <- msInfo(object)
+        res <- list()
+        for(i in 1:length(object)) {
+            args <- list()
+            args$object <- con(object, i, 'MsData')
+            args$retentionTime <- BETWEEN(info$minRT[i], info$maxRT[i])
+            if(!is.null(info$minMZ)) {
+                args$mz <- BETWEEN(info$minMZ[i], info$maxMZ[i])
+            }
+            args$msLevel <- info$msLevel[i]
+            res[[i]] <- do.call(ions, args)
+        }
+        do.call(c, res)
+    }
+)
+#' Extract peaks from the EIC
+#' 
+setMethod(
+    'peaks', 'MsChromList',
+    function(object, overlaps=FALSE, ...) {
+        info <- msInfo(object)
+        res <- list()
+        for(i in 1:length(object)) {
+            args <- list()
+            args$object <- con(object, i, 'MsData')
+            args$retentionTime <- ifelse(overlap, OVERLAPS(info$minRT[i], info$maxRT[i]), BETWEEN(info$minRT[i], info$maxRT[i]))
+            if(!is.null(info$minMZ)) {
+                args$mz <- ifelse(overlap, OVERLAPS(info$minMZ[i], info$maxMZ[i]), BETWEEN(info$minMZ[i], info$maxMZ[i]))
+            }
+            args$msLevel <- info$msLevel[i]
+            res[[i]] <- do.call(peaks, args)
+        }
+        res
     }
 )
 

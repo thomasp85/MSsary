@@ -8,7 +8,7 @@
 \usage{
 \S4method{con}{MsData}(object)
 
-\S4method{con}{MsList}(object, i)
+\S4method{con}{MsList}(object, i, type = "MsConnection")
 
 con(object, ...)
 }
