@@ -1,3 +1,10 @@
+################################################################################
+# TODO: isCentroided fails for unit mass instruments. Check if all mz diffs are 
+#       equal.
+#       
+#       getContAcqNum doesn't take polarity into account
+#
+
 #' Asses the mode of a spectrum
 #' 
 #' This function checks whether a spectrum is present in profile or centroid
@@ -38,9 +45,9 @@ isCentroided <- function(scans) {
 #' 
 #' @noRd
 #' 
-getListMapping <- function(data, conIndex) {
+getListMapping <- function(data, conIndex, memberIndex=NA, raw=0) {
     dataLengths <- sapply(data, nrow)
-    mapping <- createIntervals(dataLengths, list(conIndex=conIndex))
+    mapping <- createIntervals(dataLengths, list(conIndex=conIndex, memberIndex=memberIndex, raw=raw))
     return(mapping)
 }
 
@@ -239,7 +246,7 @@ getAcqNum <- function(con, ..., raw=FALSE) {
 #' single continuous interval from the same MS level such as needed when 
 #' extracting peaks etc.
 #' 
-getContAcqNum <- function(con, seqNum, retentionTime, msLevel) {
+getContAcqNum <- function(con, seqNum, retentionTime, msLevel, raw=FALSE) {
     msLevel <- toFilter(msLevel)
     if(msLevel$type != 'EQUALS') {
         stop('Only one msLevel can be selected')
@@ -247,7 +254,7 @@ getContAcqNum <- function(con, seqNum, retentionTime, msLevel) {
     if(!missing(seqNum) && !missing(retentionTime)) {
         stop('Either use seqNum or retentionTime - not both')
     }
-    arguments <- list(con=con, msLevel=msLevel)
+    arguments <- list(con=con, msLevel=msLevel, raw=raw)
     if(!missing(seqNum)) {
         if(!rangeFilter(seqNum)) {
             stop('seqNum must specifiy an interval: Use either \'BETWEEN\', \'ABOVE\' or \'BELOW\'')
