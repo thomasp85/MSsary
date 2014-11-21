@@ -1,3 +1,15 @@
+Version 0.0.8
+________________________________________________________________________________
+* Handling of raw vs. modified data. All raw extraction methods now have a raw
+  parameter to choose whether to extract directly from mzR connection. The 
+  nature (raw vs unraw) is saved in the MsList object and passed on to 
+  derivatives.
+* Added isRaw to test whether elements are from raw data
+* Added uNames to create truly unique names even with duplicate elements
+* Added memberIndex and raw to the mapping matrix in MsList. raw saves the 
+  rawness of the elements, memberIndex is in preparation to include MsDataSet as
+  connections instead of only MsData.
+
 Version 0.0.7
 ________________________________________________________________________________
 * Fully implemented MsPeakList with 2d and 3d plot
