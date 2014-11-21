@@ -62,6 +62,19 @@ setGeneric(
     'msPlot', def = function(object, ...) {standardGeneric('msPlot')}
 )
 
+#' Get unique names of elements
+#' 
+#' This function ensures unique element names even in the case of duplicated
+#' elements
+#' 
+#' @param object A list-like object from MSsary
+#' 
+#' @return A character vector of the same length as object
+#' 
+setGeneric(
+    'uNames', def = function(object) {standardGeneric('uNames')}
+)
+
 #' Test whether the elements of an object are empty
 #' 
 #' This function applies to list-like objects such as MsScanList and tests
@@ -90,6 +103,25 @@ setGeneric(
 #' 
 setGeneric(
     'dropEmpty', def = function(object) {standardGeneric('dropEmpty')}
+)
+
+#' Test whether the elements of an object are based on raw value
+#' 
+#' This function applies to list-like objects such as MsScanList and tests
+#' whether the individual elements of the object are based on raw unaltered
+#' values or modified ones. Note that this function just test for strictly raw-
+#' ness in the sense that it tests whether \code{raw=TRUE} was set during 
+#' construction. If the raw data has not been modified it is possible to have
+#' raw and unraw MsLists that are numerically identical.
+#' 
+#' @param object A list-like object from MSsary
+#' 
+#' @return A logical vector of the same length as object
+#' 
+#' @export
+#' 
+setGeneric(
+    'isRaw', def = function(object) {standardGeneric('isRaw')}
 )
 
 #' Extract scans from an object
@@ -304,4 +336,11 @@ setGeneric(
 #' 
 setGeneric(
     'detectPeaks', def = function(object, ...) {standardGeneric('detectPeaks')}
+)
+#' Preprocess scans
+#' 
+#' @export
+#' 
+setGeneric(
+    'prepareScans', def = function(object, ...) {standardGeneric('prepareScans')}
 )
