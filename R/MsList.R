@@ -44,7 +44,7 @@ setClass(
         if(!all(sapply(object@connections, class) == 'MsData')) {
             return('All connections must be MsConnections objects')
         }
-        if(!all(c('start', 'end', 'conIndex') %in% colnames(object@mapping))) {
+        if(!all(c('start', 'end', 'conIndex', 'memberIndex', 'raw') %in% colnames(object@mapping))) {
             return('Mapping must contain the columns \'start\', \'end\' and \'conIndex\' ')
         }
         return(TRUE)

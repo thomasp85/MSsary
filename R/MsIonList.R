@@ -152,10 +152,11 @@ setMethod(
     'scans', 'MsIonList',
     function(object, ...) {
         info <- msInfo(object)
+        raw <- isRaw(object)
         res <- list()
         for(i in 1:length(object)) {
             iCon <- con(object, i, 'MsData')
-            res[[i]] <- scans(iCon, msLevel=info$msLevel[i], retentionTime=BETWEEN(info$minRT[i], info$maxRT[i]))
+            res[[i]] <- scans(iCon, msLevel=info$msLevel[i], retentionTime=BETWEEN(info$minRT[i], info$maxRT[i]), raw=raw[i])
         }
         res
     }
@@ -199,7 +200,7 @@ setMethod(
             minMZ=msInfo(object)$minMZ,
             maxMZ=msInfo(object)$maxMZ
         )
-        mapping <- getListMapping(data, object@mapping[, 'conIndex'])
+        mapping <- getListMapping(data, object@mapping[, 'conIndex'], object@mapping[, 'memberIndex'], object@mapping[, 'raw'])
         data <- do.call(rbind, data)
         new('MsChromList', connections=object@connections, info=info, data=data, mapping=mapping)
     }

@@ -143,9 +143,10 @@ setMethod(
     'chroms', 'MsScanList',
     function(object, mz, expand=0) {
         info <- msInfo(object)
+        raw <- isRaw(object)
         res <- list()
         for(i in 1:length(object)) {
-            args <- list()
+            args <- list(raw=raw[i])
             args$object <- con(object, i, 'MsData')
             args$retentionTime <- BETWEEN(info$retentionTime[i]-expand, info$retentionTime[i]+expand)
             if(!missing(mz)) {
@@ -164,9 +165,10 @@ setMethod(
     'ions', 'MsScanList',
     function(object, mz, expand=0, ...) {
         info <- msInfo(object)
+        raw <- isRaw(object)
         res <- list()
         for(i in 1:length(object)) {
-            args <- list()
+            args <- list(raw=raw[i])
             args$object <- con(object, i, 'MsData')
             args$retentionTime <- BETWEEN(info$retentionTime[i]-expand, info$retentionTime[i]+expand)
             if(!missing(mz)) {

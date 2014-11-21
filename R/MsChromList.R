@@ -126,9 +126,10 @@ setMethod(
     'scans', 'MsChromList',
     function(object, ...) {
         chroms <- msData(object)
+        raw <- isRaw(object)
         lapply(1:length(chroms), function(i) {
             con <- con(object, i, 'MsData')
-            scans(con, acquisitionNum=IN(chroms[[i]][, 'acquisitionNum']))
+            scans(con, acquisitionNum=IN(chroms[[i]][, 'acquisitionNum']), raw=raw[i])
         })
     }
 )
@@ -138,9 +139,10 @@ setMethod(
     'ions', 'MsChromList',
     function(object, ...) {
         info <- msInfo(object)
+        raw <- isRaw(object)
         res <- list()
         for(i in 1:length(object)) {
-            args <- list()
+            args <- list(raw = raw[i])
             args$object <- con(object, i, 'MsData')
             args$retentionTime <- BETWEEN(info$minRT[i], info$maxRT[i])
             if(!is.null(info$minMZ)) {
