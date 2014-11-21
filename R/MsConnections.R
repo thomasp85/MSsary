@@ -237,11 +237,15 @@ MsConnections <- setRefClass(
                 )
             )
             existing <- keys %in% data[, key]
-            updateData(name, data[existing,], key)
-            addData(name, data[!existing,])
+            if(sum(existing) > 0) {
+                updateData(name, data[existing,], key)
+            }
+            if(sum(!existing) > 0) {
+                addData(name, data[!existing,])
+            }
         },
         getHeader = function(ids, raw=FALSE) {
-            dbGetQuery(
+            header <- dbGetQuery(
                 sary(), 
                 paste0(
                     'SELECT * FROM ', 
@@ -251,14 +255,32 @@ MsConnections <- setRefClass(
                     ')'
                 )
             )
+            header[match(header$acquisitionNum, ids),]
         },
         getScans = function(ids, raw=FALSE) {
             'Transparently extract scans, getting modified scans if they exists 
             or read from the raw file if they don\'t'
             
-            seqNum <- dbGetQuery(sary(), paste0('SELECT seqNum, acquisitionNum FROM header WHERE acquisitionNum IN (', paste(ids, collapse=', '), ')'))
-            seqNum <- seqNum[match(ids, seqNum$acquisitionNum), ]
-            p <- mzR::peaks(mzR(), seqNum$seqNum)
+            if(raw) {
+                seqNum <- dbGetQuery(sary(), paste0('SELECT seqNum, acquisitionNum FROM header WHERE acquisitionNum IN (', paste(ids, collapse=', '), ')'))
+                seqNum <- seqNum[match(ids, seqNum$acquisitionNum), ]
+                p <- mzR::peaks(mzR(), seqNum$seqNum)
+            } else {
+                p <- list()
+                scans <- dbGetQuery(sary(), paste0('SELECT * FROM scans WHERE scanNum IN (', paste(ids, collapse=', '), ')'))
+                if(sum(scans$remove == 0) > 0) {
+                    p1 <- lapply(scans$scan[scans$remove == 0], function(s) {
+                        matrix(unserialize(s), ncol=2)
+                    })
+                    p[match(scans$scanNum[scans$remove==0], ids)] <- p1
+                }
+                if(!all(ids %in% scans$scanNum)) {
+                    nIds <- ids[!(ids %in% scans$scanNum)]
+                    p2 <- getScans(nIds, raw=TRUE)
+                    p[match(nIds, ids)] <- p2
+                }
+            }
+            
             if(class(p) == 'matrix') {
                 p <- list(p)
             }
@@ -267,7 +289,7 @@ MsConnections <- setRefClass(
         setScans = function(ids, scans) {
             'Set scans to new values'
             ans <- data.frame(scanNum=ids, peaksCount=NA, totIonCurrent=NA, basePeakMZ=NA, basePeakIntensity=NA, lowMZ=NA, highMZ=NA, remove=0, scan=NA)
-            for(i in 1:length(ids)) {
+            for(i in 1:base::length(ids)) {
                 cScan <- scans[[i]]
                 nPeaks <- nrow(cScan)
                 ans$peaksCount[i] <- nPeaks
@@ -284,9 +306,15 @@ MsConnections <- setRefClass(
         removeScans = function(ids, value=TRUE) {
             'Remove scans from the set'
             
+            setData('scans', data.frame(scanNum=ids, remove=as.integer(value)), 'scanNum')
         },
-        resetScan = function(ids) {
+        resetScans = function(ids) {
             'Reset the state of scans back to its original value'
+            if(missing(ids)) {
+                dbGetQuery(sary(), 'DELETE FROM scans')
+            } else {
+                dbGetQuery(sary(), paste0('DELETE FROM scans WHERE scanNum IN (', paste(ids, collapse=', '), ')'))
+            }
         },
         getPeaks = function(ids) {
             'Extract peaks from database'
@@ -302,10 +330,10 @@ MsConnections <- setRefClass(
             peaks$peak <- lapply(peaks$peak, unserialize)
             peaks
         },
-        extractIC = function(acqNum, mzwin) {
+        extractIC = function(acqNum, mzwin, raw=FALSE) {
             scanNum <- sort(unique(do.call('c', acqNum)))
-            scans <- getScans(scanNum)
-            scanInfo <- dbGetQuery(sary(), paste0('SELECT acquisitionNum, retentionTime FROM header WHERE acquisitionNum IN (', paste(scanNum, collapse=', '), ')'))
+            scans <- getScans(scanNum, raw=raw)
+            scanInfo <- getHeader(scanNum, raw=raw)[, c('acquisitionNum', 'retentionTime')]
             XIC <- list()
             for(i in 1:base::length(acqNum)) {
                 scIndex <- match(acqNum[[i]], scanNum)
@@ -320,14 +348,14 @@ MsConnections <- setRefClass(
             }
             XIC
         },
-        extractIons = function(acqNum, mzwin=NULL) {
+        extractIons = function(acqNum, mzwin=NULL, raw=raw) {
             scanNum <- sort(unique(do.call('c', acqNum)))
-            scans <- getScans(scanNum)
-            rt <- dbGetQuery(sary(), paste0('SELECT retentionTime FROM header WHERE acquisitionNum IN (', paste(scanNum, collapse=', '), ')'))
+            scans <- getScans(scanNum, raw=raw)
+            rt <- getHeader(scanNum, raw=raw)$retentionTime
             ions <- list()
             for(i in 1:base::length(acqNum)) {
                 scIndex <- match(acqNum[[i]], scanNum)
-                rtCurrent <- rep(rt[scIndex,], sapply(scans[scIndex], nrow))
+                rtCurrent <- rep(rt[scIndex], sapply(scans[scIndex], nrow))
                 ionData <- cbind(do.call(rbind, scans[scIndex]), rtCurrent)
                 colnames(ionData) <- c('mz', 'intensity', 'retentionTime')
                 if(!is.null(mzwin)){
