@@ -109,6 +109,16 @@ setMethod(
     }
 )
 
+setMethod(
+    'prepareScans', 'MsDataSet',
+    function(object, method, ...) {
+        for(i in 1:length(object)) {
+            prepareScans(object[[i]], method, ...)
+        }
+        invisible(NULL)
+    }
+)
+
 
 ## CONSTRUCTORS
 

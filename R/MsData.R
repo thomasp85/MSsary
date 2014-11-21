@@ -254,6 +254,40 @@ setMethod(
     }
 )
 
+#' Scan preprocessing in MsData objects
+#' 
+setMethod(
+    'prepareScans', 'MsData',
+    function(object, method, ...) {
+        arguments <- list(...)
+        dataSubset <- !(names(arguments) %in% prepareMethods$methodArgs(method))
+        acqNum <- unlist(do.call(getAcqNum, c(con=con(object), arguments[dataSubset])))
+        
+        arguments <- arguments[!dataSubset]
+        arguments$name <- method
+        arguments$scans <- con(object)$getScans(acqNum)
+        arguments$info <- con(object)$getHeader(acqNum)
+        
+        scans <- do.call(prepareMethods$useMethod, arguments)
+        con(object)$setScans(arguments$info$acquisitionNum, scans)
+        
+        funcCall <- expand.call(call=sys.call(-1), expand.dots = TRUE)
+        con(object)$addData(
+            'history', 
+            data.frame(
+                time = as.character(Sys.time()),
+                operation = 'Spectra modified',
+                MSsary_version = as.character(packageVersion('MSsary')),
+                call = callToString(funcCall),
+                augPackage = prepareMethods$getPackage(method),
+                augPackVersion = prepareMethods$getVersion(method),
+                stringsAsFactors=FALSE
+            )
+        )
+        invisible(TRUE)
+    }
+)
+
 #' Peak detection in MsData object
 #' 
 setMethod(
