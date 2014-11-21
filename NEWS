@@ -1,5 +1,12 @@
 Version 0.0.8
 ________________________________________________________________________________
+* prepareMethods handles scan preprocessing. Preprocessing is accessed using
+  prepareScans.
+* Added localMax as a very simple centroiding algorithm.
+* Added ionFilter as a simple filtering mechanism for ions in centroided scans
+* Added methodStore as a virtual refclass that all methodstores should subclass
+* MsConnections can now write modified scans and transparently extract the right
+  ones.
 * Handling of raw vs. modified data. All raw extraction methods now have a raw
   parameter to choose whether to extract directly from mzR connection. The 
   nature (raw vs unraw) is saved in the MsList object and passed on to 
