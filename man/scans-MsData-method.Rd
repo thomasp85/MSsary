@@ -4,7 +4,7 @@
 \alias{scans,MsData-method}
 \title{Extract scans from an MsData object}
 \usage{
-\S4method{scans}{MsData}(object, ...)
+\S4method{scans}{MsData}(object, ..., raw = FALSE)
 }
 \description{
 This method returns one or several scans based on a range of selection

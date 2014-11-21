@@ -3,7 +3,7 @@
 \alias{getContAcqNum}
 \title{Extract a continuous range of acquisitionNums from the same MS level}
 \usage{
-getContAcqNum(con, seqNum, retentionTime, msLevel)
+getContAcqNum(con, seqNum, retentionTime, msLevel, raw = FALSE)
 }
 \description{
 This function works as getAcqNum, but are constrained to only extract a

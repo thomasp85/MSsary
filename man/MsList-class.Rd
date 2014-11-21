@@ -8,16 +8,20 @@
 \alias{c,MsList-method}
 \alias{dropEmpty,MsList-method}
 \alias{isEmpty,MsList-method}
+\alias{isRaw,MsList-method}
 \alias{length,MsList-method}
 \alias{msData,MsList-method}
 \alias{msInfo,MsList-method}
 \alias{names,MsList-method}
 \alias{sort,MsList-method}
+\alias{uNames,MsList-method}
 \title{Virtual class for MSsary list like objects}
 \usage{
 \S4method{length}{MsList}(x)
 
 \S4method{names}{MsList}(x)
+
+\S4method{uNames}{MsList}(object)
 
 \S4method{[}{MsList,numeric,missing,missing}(x, i, j, ..., drop = TRUE)
 
@@ -32,6 +36,8 @@
 \S4method{isEmpty}{MsList}(object)
 
 \S4method{dropEmpty}{MsList}(object)
+
+\S4method{isRaw}{MsList}(object)
 
 \S4method{msInfo}{MsList}(object)
 
@@ -54,6 +60,8 @@ where the data was extracted.
 
 \item \code{names}: Get the names of the elements
 
+\item \code{uNames}: Get unique names of elements
+
 \item \code{[}: Subset an MsList object
 
 \item \code{[}: Subset an MsList object
@@ -64,9 +72,11 @@ where the data was extracted.
 
 \item \code{sort}: Sort an MsList by a property
 
-\item \code{isEmpty}: See if scans are empty
+\item \code{isEmpty}: See if elements are empty
 
 \item \code{dropEmpty}: Removes empty elements
+
+\item \code{isRaw}: See if elements are based on raw values
 
 \item \code{msInfo}: Get the info for each element as a data.frame
 

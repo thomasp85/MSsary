@@ -43,6 +43,10 @@ or read from the raw file if they don't}
 
 \item{\code{mzR()}}{Get the mzRramp connection in a safe manner}
 
+\item{\code{removeScans(ids, value = TRUE)}}{Remove scans from the set}
+
+\item{\code{resetScans(ids)}}{Reset the state of scans back to its original value}
+
 \item{\code{sary()}}{Get the sary database connection in a safe manner}
 
 \item{\code{setData(name, data, key)}}{Insert or update data depending on the existence of key}
