@@ -34,3 +34,62 @@ NumericMatrix getXIC(List scans, double mzmin, double mzmax) {
     }
     return(res);
 }
+
+//' Get intensity threshold for a given signal-to-noise ratio
+//' 
+//' This function takes a scan and finds the first non-noise ion in it based on
+//' the dynamic noise level algorithm described by Xu and Freitas (2009). It 
+//' returns the intensity of that ion.
+//' 
+//' @param scan A matrix with mz and intensity values
+//' @param sn The required minimum signal-to-noise to be considered a real 
+//' signal
+//' @param rho The modifier to use for the second lowest ion special case
+//' 
+//' @return A numeric with the intensity of the first ion that gets accepted as
+//' a true signal
+//' 
+//' @references Xu, H., & Freitas, M. A. (2009). A dynamic noise level algorithm 
+//' for spectral screening of peptide MS/MS spectra. BMC Bioinformatics, 11, 
+//' 436–436. doi:10.1186/1471-2105-11-436
+//' 
+//[[Rcpp::export]]
+NumericVector scanNoise(NumericMatrix scan, double sn, double rho) {
+    NumericVector intensity = scan(_,1);
+    std::sort(intensity.begin(), intensity.end());
+    double iHat;
+    double SNR;
+    NumericVector res(1);
+    
+    int i = 0;
+    double xSum = 0;
+    double ySum = 0;
+    double xxSum = 0;
+    double xySum = 0;
+    double slope;
+    double intercept;
+    
+    for(NumericVector::iterator it = intensity.begin(); it != intensity.end(); ++it) {
+        if(i == 1) {
+            iHat = *(it-1) * (1 + rho);
+        } else if(i > 1) {
+            slope = ((i+1) * xySum - xSum * ySum) / ((i+1) * xxSum - xSum * xSum);
+            intercept = (ySum - slope * xSum) / i;
+            iHat = slope * (i+1) + intercept;
+        }
+        if(i != 0) {
+            SNR = (*it) / iHat;
+            if(SNR > sn) {
+                res[0] = *it;
+                break;
+            }
+        }
+        
+        xSum += i;
+        ySum += *it;
+        xxSum += i*i;
+        xySum += i*(*it);
+        i++;
+    }
+    return res;
+}

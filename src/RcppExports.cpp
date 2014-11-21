@@ -45,3 +45,20 @@ BEGIN_RCPP
     return __sexp_result;
 END_RCPP
 }
+// scanNoise
+NumericVector scanNoise(NumericMatrix scan, double sn, double rho);
+RcppExport SEXP MSsary_scanNoise(SEXP scanSEXP, SEXP snSEXP, SEXP rhoSEXP) {
+BEGIN_RCPP
+    SEXP __sexp_result;
+    {
+        Rcpp::RNGScope __rngScope;
+        Rcpp::traits::input_parameter< NumericMatrix >::type scan(scanSEXP );
+        Rcpp::traits::input_parameter< double >::type sn(snSEXP );
+        Rcpp::traits::input_parameter< double >::type rho(rhoSEXP );
+        NumericVector __result = scanNoise(scan, sn, rho);
+        PROTECT(__sexp_result = Rcpp::wrap(__result));
+    }
+    UNPROTECT(1);
+    return __sexp_result;
+END_RCPP
+}
