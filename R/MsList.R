@@ -102,6 +102,23 @@ setMethod(
     }
 )
 
+#' @describeIn MsList Get unique names of elements
+#' 
+setMethod(
+    'uNames', 'MsList',
+    function(object) {
+        n <- names(object)
+        if(any(duplicated(n))) {
+            multiples <- unique(n[duplicated(n)])
+            for(i in multiples) {
+                ind <- n == i
+                n[ind] <- paste0(n[ind], '.', 1:sum(ind))
+            }
+        }
+        n
+    }
+)
+
 #' @describeIn MsList Subset an MsList object
 #' 
 setMethod(
@@ -204,7 +221,7 @@ setMethod(
     }
 )
 
-#' @describeIn MsList See if scans are empty
+#' @describeIn MsList See if elements are empty
 #' 
 setMethod(
     'isEmpty', 'MsList',
@@ -221,13 +238,22 @@ setMethod(
     }
 )
 
+#' @describeIn MsList See if elements are based on raw values
+#' 
+setMethod(
+    'isRaw', 'MsList',
+    function(object) {
+        object@mapping[, 'raw'] == 1
+    }
+)
+
 #' @describeIn MsList Get the info for each element as a data.frame
 #' 
 setMethod(
     'msInfo', 'MsList',
     function(object) {
         info <- object@info
-        rownames(info) <- names(object)
+        rownames(info) <- uNames(object)
         info
     }
 )
