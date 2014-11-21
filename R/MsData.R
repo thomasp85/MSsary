@@ -1,8 +1,9 @@
 ################################################################################
 # TODO: Register identification object with specific methods
-#       Resolve querying raw data - use of header vs currentHeader
-#       Create empty MsList when criteria is not met
-#       peaks method for all relevant MsList subclasses
+#           A unique ID defined for the id class is merged with either peaks or
+#           links - this id is carried around and included in exports and can be
+#           used to query the id object at a later time.
+#       Create empty MsList when criteria is not met.
 #
 #       Copy method for MsData
 #
@@ -124,15 +125,14 @@ setMethod(
 #' 
 setMethod(
     'scans', 'MsData',
-    function(object, ...) {
-        acqNum <- unlist(getAcqNum(con(object), ...))
+    function(object, ..., raw=FALSE) {
+        acqNum <- unlist(getAcqNum(con(object), ..., raw=raw))
         if(length(acqNum) == 0) {
             stop('No scans match criteria')
         }
-        scInfo <- dbGetQuery(con(object)$sary(), paste0('SELECT * FROM header WHERE acquisitionNum IN (', paste(acqNum, collapse=', '), ')'))
-        scData <- con(object)$getScans(scInfo$acquisitionNum)
-        if(class(scData) == 'matrix') scData <- list(scData)
-        mapping <- getListMapping(scData, 1)
+        scInfo <- con(object)$getHeader(acqNum, raw=raw)
+        scData <- con(object)$getScans(acqNum, raw=raw)
+        mapping <- getListMapping(scData, 1, raw=as.integer(raw))
         mapping <- cbind(mapping, matrix(isCentroided(scData), dimnames = list(NULL, 'mode')))
         scData <- do.call(rbind, scData)
         colnames(scData) <- c('mz', 'intensity')
@@ -150,14 +150,14 @@ setMethod(
 #' 
 setMethod(
     'chroms', 'MsData',
-    function(object, ..., mz) {
+    function(object, ..., mz, raw=FALSE) {
         args <- list(...)
-        acqNum <- getContAcqNum(con(object), ...)
+        acqNum <- getContAcqNum(con(object), ..., raw=raw)
         msLevels <- toFilter(args$msLevel)$data
         msLevels <- rep(msLevels, length.out=length(acqNum))
         if(missing(mz)) {
             scanNums <- sort(unique(do.call('c', acqNum)))
-            data <- dbGetQuery(con(object)$sary(), paste0('SELECT acquisitionNum, retentionTime, totIonCurrent, basePeakIntensity FROM header WHERE acquisitionNum IN (', paste(scanNums, collapse=', '), ')'))
+            data <- con(object)$getHeader(scanNums, raw=raw)[, c('acquisitionNum', 'retentionTime', 'totIonCurrent', 'basePeakIntensity')]
             data <- lapply(acqNum, function(x) {data[data$acquisitionNum %in% x,]})
         } else {
             if(!rangeFilter(mz)) {
@@ -169,7 +169,7 @@ setMethod(
             } else if(length(acqNum) < length(mzFunc)) {
                 acqNum <- rep(acqNum, length.out=length(mzFunc))
             }
-            data <- con(object)$extractIC(acqNum, mzFunc)
+            data <- con(object)$extractIC(acqNum, mzFunc, raw=raw)
         }
         info <- lapply(1:length(data), function(i) {
             data.frame(
@@ -188,7 +188,7 @@ setMethod(
             colnames(mzRange) <- c('minMZ', 'maxMZ')
             info <- cbind(info, mzRange)
         }
-        mapping <- getListMapping(data, 1)
+        mapping <- getListMapping(data, 1, raw=as.integer(raw))
         data <- as.matrix(do.call(rbind, data))
         cNames <- c('acquisitionNum', 'retentionTime', 'TIC', 'BPC')
         colnames(data) <- cNames
@@ -200,9 +200,9 @@ setMethod(
 #' 
 setMethod(
     'ions', 'MsData',
-    function(object, ..., mz) {
+    function(object, ..., mz, raw=FALSE) {
         args <- list(...)
-        acqNum <- getContAcqNum(con(object), ...)
+        acqNum <- getContAcqNum(con(object), ..., raw=raw)
         msLevels <- toFilter(args$msLevel)$data
         msLevels <- rep(msLevels, length.out=length(acqNum))
         
@@ -219,7 +219,7 @@ setMethod(
                 acqNum <- rep(acqNum, length.out=length(mzFunc))
             }
         }
-        data <- con(object)$extractIons(acqNum, mzFunc)
+        data <- con(object)$extractIons(acqNum, mzFunc, raw=raw)
         info <- mapply(function(x, msLevel) {
             data.frame(
                 msLevel=msLevel,
@@ -232,7 +232,7 @@ setMethod(
             )
         }, x=data, msLevel=msLevels, SIMPLIFY=FALSE)
         info <- do.call(rbind, info)
-        mapping <- getListMapping(data, 1)
+        mapping <- getListMapping(data, 1, raw=as.integer(raw))
         data <- do.call(rbind, data)
         new('MsIonList', connections=list(object), info=info, data=data, mapping=mapping)
     }
