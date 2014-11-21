@@ -59,6 +59,9 @@ peakMethodStore <- setRefClass(
             "Test the provided inputs to see if they are sound and corresponds
              to the requirements set when the function was reqistered"
             
+            if(!hasMethod(name)) {
+                stop('No method of name \"', name, '\" available')
+            }
             if(!is.null(requirements[name]$mode)) {
                 randInd <- sample(1:length(scans), 10)
                 mode <- ifelse(all(isCentroided(scans[randInd])), 'centroid', 'profile')
@@ -87,9 +90,7 @@ peakMethodStore <- setRefClass(
              Input and output are automatically tested to ensure conformance."
             
             resultNames <- c('mzMean', 'mzMin', 'mzMax', 'scanStart', 'scanEnd', 'length', 'area', 'maxHeight', 'peak')
-            if(!hasMethod(name)) {
-                stop('No method of name \"', name, '\" available')
-            }
+            
             testInput(name, scans, info)
             res <- getMethod(name)(scans, info, ...)
             if(class(res) != 'data.frame') {
