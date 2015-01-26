@@ -49,7 +49,9 @@ peakTableFormat <- c(
     'peakID     INTEGER PRIMARY KEY AUTOINCREMENT',
     'msLevel    INTEGER NOT NULL',
     'length     INTEGER NOT NULL',
+    'FWHM       REAL NOT NULL',
     'mzMean     REAL NOT NULL',
+    'scanMax    INTEGER NOT NULL',
     'maxHeight  REAL NOT NULL',
     'area       REAL NOT NULL',
     'peak       BLOB NOT NULL'

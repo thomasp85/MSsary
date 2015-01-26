@@ -4,6 +4,10 @@
 #                   Reimplement square rooting where relevant
 #
 
+#' @include methodStore.R
+#' 
+NULL
+
 #' Object to handle all peak detection methods
 #' 
 #' This peakMethods object is the sole instance of a peakMethodStore reference 
@@ -22,46 +26,12 @@
 #' 
 peakMethodStore <- setRefClass(
     'peakMethodStore',
-    fields=list(
-        functions='list',
-        requirements='list',
-        package='list',
-        packVersion='list'
-    ),
+    contains='methodStore',
     methods=list(
-        initialize=function() {
-            "Initialize the object to be empty"
-            
-            functions <<- list()
-            requirements <<- list()
-        },
-        hasMethod=function(name) {
-            "Check for registered functions of the given name"
-            
-            any(names(functions) == name)
-        },
-        getMethod=function(name) {
-            "Get the function of the given name"
-            
-            functions[[name]]
-        },
-        getPackage=function(name) {
-            "Get the package from where a function originates"
-            
-            package[[name]]
-        },
-        getVersion=function(name) {
-            "Get the version of the package from where a function originates"
-            
-            packVersion[[name]]
-        },
         testInput=function(name, scans, info) {
             "Test the provided inputs to see if they are sound and corresponds
              to the requirements set when the function was reqistered"
             
-            if(!hasMethod(name)) {
-                stop('No method of name \"', name, '\" available')
-            }
             if(!is.null(requirements[name]$mode)) {
                 randInd <- sample(1:length(scans), 10)
                 mode <- ifelse(all(isCentroided(scans[randInd])), 'centroid', 'profile')
@@ -78,18 +48,12 @@ peakMethodStore <- setRefClass(
             if(!identical(sort(info$seqNum), info$seqNum)) {
                 stop('Scans doesn\'t seem to be consecutive')
             }
-            if(!is.null(requirements[name]$extraInfo)) {
-                extraInfo <- requirements[name]$extraInfo %in% names(info)
-                if(!all(extraInfo)) {
-                    stop('Missing scan information: ', paste(requirements[name]$extraInfo[!extraInfo], collapse=', '))
-                }
-            }
         },
         useMethod=function(name, scans, info, ...) {
             "Runs the function given by \'name\' with the supplied arguments.
              Input and output are automatically tested to ensure conformance."
             
-            resultNames <- c('mzMean', 'mzMin', 'mzMax', 'scanStart', 'scanEnd', 'length', 'area', 'maxHeight', 'peak')
+            resultNames <- c('mzMean', 'mzMin', 'mzMax', 'scanStart', 'scanEnd', 'scanMax', 'length', 'FWHM', 'area', 'maxHeight', 'peak')
             
             testInput(name, scans, info)
             res <- getMethod(name)(scans, info, ...)
@@ -107,23 +71,11 @@ peakMethodStore <- setRefClass(
             "Register a new function with the given \'name\' and optionally sets
              the requirements"
             
-            if(any(names(functions) == name)) {
-                stop('Name already exists')
-            }
-            if(class(requirements) != 'list') {
-                stop('Requirements must be in the form of a list')
-            }
             if(!all(c('scans', 'info') %in% names(formals(fun)))) {
                 stop('Function arguments must include \'scans\' and \'info\'')
             }
             
-            functionName <- deparse(substitute(fun))
-            packageName <- sub('.*:', '', getAnywhere(functionName)$where[1])
-            
-            functions[[name]] <<- fun
-            requirements[[name]] <<- req
-            package[[name]] <<- packageName
-            packVersion[[name]] <<- as.character(packageVersion(packageName))
+            callSuper(name, fun, req)
         }
     )
 )

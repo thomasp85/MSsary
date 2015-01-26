@@ -41,7 +41,7 @@ setGeneric(
 #' @keywords internal
 #' 
 setGeneric(
-    'meltMS', def = function(object) {standardGeneric('meltMS')}
+    'meltMS', def = function(object, ...) {standardGeneric('meltMS')}
 )
 
 #' Generic plot function for MSsary objects

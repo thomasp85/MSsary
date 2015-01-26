@@ -190,6 +190,7 @@ getScanList <- function(object, query) {
     info <- do.call(rbind, info)
     data <- unlist(data, recursive=FALSE)
     mapping <- getListMapping(data, object@mapping[, 'conIndex'])
+    mapping <- cbind(mapping, matrix(isCentroided(data), dimnames = list(NULL, 'mode')))
     data <- do.call(rbind, data)
     colnames(data) <- c('mz', 'intensity')
     new('MsScanList', connections=object@connections, info=info, data=data, mapping=mapping)
@@ -411,7 +412,8 @@ binIons <- function(ions, fun=max, mzBins=500, rtBins=mzBins) {
     data.frame(
         retentionTime = (rtBreaks[1:rtBins]+binWidthRT/2)[match(ans$rtBin, levels(rtBin))],
         mz = (mzBreaks[1:mzBins]+binWidthMZ/2)[match(ans$mzBin, levels(mzBin))],
-        intensity = ans$intensity
+        intensity = ans$intensity,
+        sample = ions$sample[1]
     )
 }
 
@@ -501,4 +503,54 @@ expand.call <- function(definition=NULL, call=sys.call(sys.parent(1)), expand.do
 #' 
 callToString <- function(call) {
     paste(sub('^\\s+', '', deparse(call)), collapse='')
+}
+
+#' Replacement for the gtable rbind
+rbindGtable <- function(..., size = "max", z = NULL) {
+    gtables <- list(...)
+    if (!is.null(z)) {
+        gtables <- gtable:::z_arrange_gtables(gtables, z)
+    }
+    Reduce(function(x, y) rbind_gtable(x, y, size = size), gtables)
+}
+
+rbind_gtable <- function(x, y, size = "max") {
+    if (nrow(x) == 0) return(y)
+    if (nrow(y) == 0) return(x)
+    if(ncol(x) > ncol(y)) {
+        y <- gtable_add_cols(y, rep(grid::unit(1e-6, 'mm'), ncol(x)-ncol(y)))
+        background <- grep('background', y$layout$name)
+        y$layout$r[background] <- ncol(y)
+    }
+    if(ncol(x) < ncol(y)) {
+        x <- gtable_add_cols(x, rep(grid::unit(1e-6, 'mm'), ncol(y)-ncol(x)))
+        background <- grep('background', x$layout$name)
+        x$layout$r[background] <- ncol(x)
+    }
+    
+    y$layout$t <- y$layout$t + nrow(x)
+    y$layout$b <- y$layout$b + nrow(x)
+    x$layout <- rbind(x$layout, y$layout)
+    
+    x$heights <- gtable:::insert.unit(x$heights, y$heights)
+    x$rownames <- c(x$rownames, y$rownames)
+    
+    size <- match.arg(size, c("first", "last", "max", "min"))
+    x$widths <- switch(size,
+                       first = x$widths,
+                       last = y$widths,
+                       min = grid::unit.pmin(x$widths, y$widths),
+                       max = grid::unit.pmax(x$widths, y$widths)
+    )
+    
+    x$grobs <- append(x$grobs, y$grobs)
+    
+    backgrounds <- grep('background', x$layout$name)
+    
+    x$layout <- x$layout[-backgrounds[2],]
+    x$grobs[backgrounds[2]] <- NULL
+    x$layout$r[backgrounds[1]] <- ncol(x)
+    x$layout$b[backgrounds[1]] <- nrow(x)
+    
+    x
 }

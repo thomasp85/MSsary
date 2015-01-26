@@ -1,5 +1,6 @@
 ################################################################################
 # TODO: Ordering of plots doesn't follow scan order
+#       writeMGF for MsScanList
 #
 
 #' @include aaa.R
@@ -25,20 +26,12 @@ NULL
 #' 
 setClass(
     'MsScanList',
-    contains = 'MsList'
-)
-setMethod(
-    'initialize', 'MsScanList',
-    function(.Object, connections, info, data, mapping) {
-        .Object@connections <- connections
-        .Object@info <- info
-        .Object@data <- data
-        .Object@mapping <- mapping
-        if(!'mode' %in% colnames(mapping) && nrow(data) != 0) {
-            mode <- isCentroided(msData(.Object))
-            .Object@mapping <- cbind(.Object@mapping, matrix(mode, dimnames=list(NULL, 'mode')))
+    contains = 'MsList',
+    validity = function(object) {
+        if(!('mode' %in% colnames(object@mapping)) & length(object) != 0) {
+            return('MsScanList must contain the mode of the spectrum')
         }
-        .Object
+        return(TRUE)
     }
 )
 
@@ -96,15 +89,79 @@ setMethod(
 #' 
 setMethod(
     'meltMS', 'MsScanList',
-    function(object) {
+    function(object, extraData) {
+        info <- msInfo(object)
         if(any(isEmpty(object))) {
             warning('Empty scans removed')
         }
         scanIndex <- getElementIndex(object@mapping)
-        meltData <- data.frame(sample=msInfo(object)$acquisitionNum[scanIndex], mode=scanMode(object)[scanIndex], object@data)
+        meltData <- data.frame(sample=uNames(object)[scanIndex], mode=scanMode(object)[scanIndex], object@data)
+        if(!missing(extraData)) {
+            meltData <- cbind(meltData, info[scanIndex, extraData])
+        }
         meltData
     }
 )
+annotateIons <- function(object, precursor=FALSE, parent=FALSE, peaks=FALSE, masses=0, tolerance=20) {
+    if(!any(precursor, parent, peaks, masses!=0)) return(NULL)
+    info <- msInfo(object)
+    mode <- scanMode(object)
+    
+    res <- list()
+    
+    for(i in 1:length(object)) {
+        scan <- as.data.frame(object[[i]])
+        scan$sample <- rownames(info)[i]
+        
+        if(mode[i] == 'profile') {
+            scan <- scan[which(diff(sign(diff(scan$intensity)))==-2)+1, ]
+        }
+        scan$peak <- FALSE
+        scan$type <- NA_character_
+        scan$mass <- FALSE
+        
+        if(peaks) {
+            p <- peaks(object[i])[[1]]
+            if(length(p) != 0) {
+                pInfo <- msInfo(p)
+                lx <- outer(scan$mz, pInfo$mzMin, ">=" )
+                hx <- outer(scan$mz, pInfo$mzMax, "<=" )
+                scan$peak <- apply(lx*hx, 1, sum) > 0
+            }
+        }
+        
+        if(parent && info$precursorMZ[i] != 0) {
+            parentInd <- which.min(abs(scan$mz - info$precursorMZ[i]))
+            if(abs(scan$mz[parentInd] - info$precursorMZ[i]) < info$precursorMZ[i]*tolerance/1e6) {
+                scan$type[parentInd] <- 'Parent'
+            }
+        }
+        
+        if(precursor) {
+            acqNum <- getAcqNum(con(object, i), precursorScanNum=info$acquisitionNum[i], raw=isRaw(object)[i])
+            if(length(acqNum) != 0) {
+                childHead <- con(object, i)$getHeader(acqNum[[1]], raw=isRaw(object)[i])
+                diffs <- abs(outer(scan$mz, childHead$precursorMZ, `-`))
+                childInd <- apply(diffs, 2, which.min)
+                scan$type[childInd] <- 'Precursor'
+            }
+        }
+        
+        if(masses != 0) {
+            nLab <- min(nrow(scan), masses)
+            labelInds <- order(scan$intensity, decreasing = T)[1:nLab]
+            scan$mass[labelInds] <- TRUE
+        }
+        
+        scan <- scan[scan$peak | !is.na(scan$type) | scan$mass, ]
+        if(!peaks) scan$peak <- NULL
+        if(!parent && !precursor) scan$type <- NULL
+        if(masses == 0) scan$mass <- NULL
+        
+        res[[i]] <- scan
+    }
+    do.call(rbind, res)
+}
 
 #' @describeIn MsScanList Create a plot
 #' 
@@ -112,28 +169,66 @@ setMethod(
 #' 
 setMethod(
     'msPlot', 'MsScanList',
-    function(object, simple = FALSE,  ...) {
+    function(object, simple = FALSE, parent=!simple, precursor=!simple, peaks=!simple, masses=ifelse(simple, 0, 10), context=!simple, tolerance=20, ...) {
         data <- meltMS(object)
+        ann <- annotateIons(object, precursor, parent, peaks, masses, tolerance)
         p <- ggplot(data) + theme_bw()
         if(any(scanMode(object) == 'centroid')) {
-            p <- p + geom_segment(aes(x=mz, xend=mz, y=0, yend=intensity), data=subset(data, mode=='centroid'))
+            p <- p + geom_segment(aes(x=mz, xend=mz, y=0, yend=intensity), data=subset(data, mode=='centroid'), color=ifelse(peaks, 'grey', 'black'))
         }
         if(any(scanMode(object) == 'profile')) {
-            p <- p + geom_line(aes(x=mz, y=intensity), data=subset(data, mode=='profile'))
+            p <- p + geom_line(aes(x=mz, y=intensity), data=subset(data, mode=='profile'), color=ifelse(peaks, 'grey', 'black'))
         }
-        if(length(object) == 1 && !simple) {
-            scanNum <- msInfo(object)$acquisitionNum
-            if(msInfo(object)$msLevel == 1) {
-                children <- dbGetQuery(con(object, 1)$sary(), paste0('SELECT precursorMZ FROM header WHERE precursorScanNum == ', scanNum))
-                if(nrow(children) != 0) {
-                    fragmentScans <- annotateChildren(data, children, scanMode(object))
-                    p <- p + geom_point(aes(x=mz, y=intensity, colour=I('black')), data=fragmentScans) + scale_colour_discrete('', breaks='black', labels='Precursor ions')
-                }
-            }
+        if(peaks && any(ann$peak)) {
+            p <- p + geom_segment(aes(x=mz, xend=mz, y=0, yend=intensity, color=peak), data=ann[ann$peak,, drop=FALSE])
+            p <- p + scale_colour_manual('', values='steelblue', labels='Peaks')
+        }
+        if(parent | precursor) {
+            p <- p + geom_point(aes(x=mz, y=intensity, shape=type), data=ann[!is.na(ann$type), ], color='forestgreen', size=I(3))
+            p <- p + scale_shape('')
+        }
+        if(masses != 0) {
+            p <- p + geom_text(aes(x=mz, y=intensity, label=format(mz)), data=ann[ann$mass, , drop=FALSE], size=2.5, vjust=-0.6, hjust=0.5)
         }
         p <- p + facet_grid(sample ~ ., scales='free_y')
         p <- p + scale_y_continuous('Intensity') + scale_x_continuous('m/z')
-        p
+        if(length(object) == 1 & context) {
+            suppressMessages({
+                oPlot <- ggplotGrob(p + scale_y_continuous(''))
+            })
+            if(msInfo(object)$msLevel == 1) {
+                cChrom <- chroms(con(object, 1, 'MsData'), msLevel=1)
+                cData <- data.frame(cChrom[[1]])
+                cData$name <- 'TIC'
+                cPlot <- ggplot(cData, aes(x=retentionTime, y=TIC)) + theme_bw()
+                cPlot <- cPlot + geom_line(colour='grey')
+                prec <- cData[which.min(abs(cData$retentionTime-msInfo(object)$retentionTime)), , drop=FALSE]
+                cPlot <- cPlot + geom_point(data=prec)
+                cPlot <- cPlot + facet_grid(name ~ .) + scale_y_continuous('') + scale_x_continuous('Retention time (sec)')
+            } else {
+                cScan <- parent(object)
+                cData <- meltMS(cScan)
+                if(scanMode(cScan) == 'profile') {
+                    cData <- cData[which(diff(sign(diff(cData$intensity)))==-2)+1, ]
+                }
+                cData$name <- 'Precursor scan'
+                prec <- cData[which.min(abs(cData$mz-msInfo(object)$precursorMZ)), , drop=FALSE]
+                cPlot <- ggplot(cData) + theme_bw()
+                cPlot <- cPlot + geom_vline(aes(xintercept=mz), data=prec, linetype='dashed', colour='darkgrey')
+                cPlot <- cPlot + geom_segment(aes(x=mz, xend=mz, y=intensity, yend=0), colour='grey')
+                cPlot <- cPlot + geom_segment(aes(x=mz, xend=mz, y=intensity, yend=0), data=prec)
+                cPlot <- cPlot + facet_grid(name ~ .) + scale_y_continuous('') + scale_x_continuous('')
+            }
+            cPlot <- ggplotGrob(cPlot)
+            p <- rbindGtable(cPlot, oPlot, size='max')
+            p <- gtable_add_grob(p, textGrob('Intensity', rot=90), 3, 2, 9)
+            p$heights[p$layout$t[grep('panel', p$layout$name)]] <- lapply(c(1,3), grid::unit, 'null')
+            p <- p[-c(5,7),]
+            plot(p)
+            invisible(p)
+        } else {
+            p
+        }
     }
 )
 

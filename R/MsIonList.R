@@ -53,29 +53,42 @@ setMethod(
         n
     }
 )
-
+#' @describeIn meltMS melt an MsIonList
+#' 
+setMethod(
+    'meltMS', 'MsIonList',
+    function(object, extraData) {
+        info <- msInfo(object)
+        scanIndex <- getElementIndex(object@mapping)
+        meltData <- data.frame(sample=uNames(object)[scanIndex], object@data)
+        meltData
+    }
+)
 #' @describeIn MsIonList Create a plot
 #' 
 #' @param type Which type of plots should be plotted
 #' 
-#' @import ggplot2 gtable grid
+#' @import ggplot2 gtable grid dplyr
 #' @importFrom RColorBrewer brewer.pal
 #' 
 setMethod(
     'msPlot', 'MsIonList',
-    function(object, type='2d', simple=FALSE, precursors=!simple, ...) {
+    function(object, type='2d', simple=FALSE, precursor=!simple, peaks=!simple, ...) {
         if(length(object) != 1) stop('Only plotting of single ionsets supported atm.')
-        data <- data.frame(object@data)
+        data <- meltMS(object)
         cScale <- brewer.pal(9, 'YlOrRd')
         if(type == '2d') {
-            data <- binIons(data, ...)
+            data <- data %>%
+                group_by(sample) %>%
+                do(binIons(., ...))
+            
             data$row <- 2
             data$col <- 1
             p <- ggplot(data, aes(x=retentionTime, y=mz, fill=intensity)) + theme_bw()
             p <- p + geom_raster()
             p <- p + scale_y_continuous('m/z') + scale_x_continuous('Retention time (sec)')
             p <- p + scale_fill_gradientn('Intensity', colours=cScale, na.value=rgb(0,0,0,0))
-            if(precursors) {
+            if(precursor) {
                 info <- msInfo(object)
                 precursorData <- dbGetQuery(
                     con(object, 1)$sary(), 
@@ -103,7 +116,7 @@ setMethod(
                 
                 p <- p + theme(strip.background=element_blank(), strip.text=element_blank())
                 
-                gt <- ggplot_gtable(ggplot_build(p))
+                gt <- ggplotGrob(p)
                 emptyGrobInd <- which(gt$layout$t == 4 & gt$layout$l == 6)
                 gt$grobs[[emptyGrobInd]] <- grob()
                 panels <- gt$layout$t[grep("panel", gt$layout$name)]
@@ -121,6 +134,9 @@ setMethod(
                 p
             }
         } else if(type == '3d') {
+            if(length(object) != 0) {
+                stop('3D plots only supported for ion lists of length 1')
+            }
             if(!require(rgl)) {
                 stop('rgl package needed')
             }

@@ -1,5 +1,5 @@
 ################################################################################
-# TODO: scans, ions and chroms method
+# TODO: 
 
 #' @include aaa.R
 #' @include generics.R
@@ -77,10 +77,39 @@ setMethod(
             warning('Empty scans removed')
         }
         scanIndex <- getElementIndex(object@mapping)
-        meltData <- data.frame(peak=msInfo(object)$peakID[scanIndex], object@data)
+        meltData <- data.frame(peak=uNames(object)[scanIndex], object@data, stringsAsFactors=FALSE)
         meltData
     }
 )
+
+annotatePeak <- function(object, precursor) {
+    if(!precursor) return(NULL)
+    res <- list()
+    info <- msInfo(object)
+    for(i in 1:length(object)) {
+        data <- as.data.frame(object[[i]])
+        data$peak <- rownames(info)[i]
+        
+        data$precursor <- FALSE
+        
+        acqNum <- getAcqNum(con(object, i), seqNum=BETWEEN(info$scanStart[i], info$scanEnd[i]))
+        acqNum <- getAcqNum(con(object, i), precursorScanNum=IN(acqNum[[1]]), precursorMZ=BETWEEN(info$mzMin[i], info$mzMax[i]))
+        if(length(acqNum[[1]]) != 0) {
+            if(precursor) {
+                prec <- con(object, i)$getHeader(acqNum[[1]])
+                prec$precursorRT <- con(object, i)$getHeader(prec$precursorScanNum)$retentionTime
+                ionMatch <- outer(data$intensity, prec$precursorIntensity, '==') * outer(data$retentionTime, prec$precursorRT, '==')
+                data$precursor <- apply(ionMatch, 1, any)
+            }
+        }
+        
+        data <- data[data$precursor, , drop=FALSE]
+        if(!precursor) data$precursor <- NULL
+        
+        res[[i]] <- data
+    }
+    do.call(rbind, res)
+}
 
 #' @describeIn MsPeakList Create a plot
 #' 
@@ -88,16 +117,67 @@ setMethod(
 #' 
 setMethod(
     'msPlot', 'MsPeakList',
-    function(object, type='2d', collapse=length(object) > 12,  ...) {
+    function(object, type='2d', collapse=length(object) > 12, simple=FALSE, precursor=!simple, mzscatter=!simple, context=!simple, ...) {
         if(type == '2d') {
             data <- meltMS(object)
+            ann <- annotatePeak(object, precursor)
             p <- ggplot(data=data) + theme_bw()
-            p <- p + geom_line(aes(x=retentionTime, y=intensity, group=peak))
-            if(!collapse) {
-                p <- p + facet_wrap(~peak, scales='free')
+            if(collapse) {
+                p <- p + geom_line(aes(x=retentionTime, y=intensity, group=peak, colour=peak))
+            } else {
+                p <- p + geom_line(aes(x=retentionTime, y=intensity, group=peak))
             }
             p <- p + scale_x_continuous('Retention time (sec)') + scale_y_continuous('Intensity')
-            p
+            if(precursor & sum(ann$precursor) != 0) {
+                p <- p + geom_point(aes(x=retentionTime, y=intensity, colour=precursor), data=ann[ann$precursor,], size=I(3))
+                p <- p + scale_colour_manual('', values='forestgreen', labels='Precursor')
+            }
+            if(length(object) == 1 && any(mzscatter, context)) {
+                if(mzscatter) {
+                    info <- msInfo(object)
+                    scanRange <- c(info$scanStart, info$scanEnd)
+                    scanRange <- diff(scanRange)*0.1*c(-1, 1) + scanRange
+                    mzRange <- c(info$mzMin, info$mzMax)
+                    mzRange <- diff(mzRange)*0.1*c(-1, 1) + mzRange
+                    ionData <- ions(con(object, 1, 'MsData'), msLevel=info$msLevel, seqNum=BETWEEN(scanRange[1], scanRange[2]), mz=BETWEEN(mzRange[1], mzRange[2]))
+                    ionData <- data.frame(ionData[[1]])
+                    ionData$peak <- 'Ion scatter'
+                    ionMatch <- outer(ionData$intensity, data$intensity, '==') * outer(ionData$retentionTime, data$retentionTime, '==')
+                    ionData$selected <- apply(ionMatch, 1, any)
+                    p <- p + geom_point(aes(x=retentionTime, y=mz), data=ionData, colour='grey')
+                    p <- p + geom_point(aes(x=retentionTime, y=mz), data=ionData[ionData$selected, ])
+                    p <- p + facet_grid(peak~., scales='free_y')
+                    p <- ggplotGrob(p)
+                    p$heights[p$layout$t[grep('panel', p$layout$name)]] <- lapply(c(3,1), grid::unit, 'null')
+                    p$layout$b[p$layout$name=='ylab'] <- 3
+                    p <- gtable_add_grob(p, textGrob('m/z', rot=90), 5, 2)
+                }
+                if(context) {
+                    cChrom <- chroms(con(object, 1, 'MsData'), msLevel=1)
+                    cData <- data.frame(cChrom[[1]])
+                    cData$name <- 'BPC'
+                    cPlot <- ggplot(cData, aes(x=retentionTime, y=BPC)) + theme_bw()
+                    cPlot <- cPlot + geom_line(colour='grey')
+                    cPlot <- cPlot + geom_line(aes(x=retentionTime, y=intensity), data=data)
+                    cPlot <- cPlot + facet_grid(name ~ .) + scale_y_continuous('') + scale_x_continuous('') + theme(axis.title.x=element_blank())
+                    cPlot <- ggplotGrob(cPlot)
+                    if(!inherits(p, 'gtable')) {
+                        p <- p + facet_grid(peak~., scales='free_y')
+                        p <- ggplotGrob(p)
+                    }
+                    p <- rbindGtable(cPlot, p, size='max')
+                    p$heights[p$layout$t[grep('panel', p$layout$name)[1:2]]] <- lapply(c(1,3), grid::unit, 'null')
+                    p$layout$t[p$layout$name=='ylab'] <- 3
+                    p <- p[-c(5,7),]
+                }
+                plot(p)
+                invisible(p)
+            } else {
+                if(!collapse) {
+                    p <- p + facet_wrap(~peak, scales='free')
+                }
+                p
+            }
         } else if(type=='3d') {
             if(!require(rgl)) {
                 stop('rgl package needed')
@@ -108,7 +188,7 @@ setMethod(
             on.exit(par3d(skip))
             data <- msData(object)
             info <- msInfo(object)
-            data <- lapply(1:length(data), function(i) {rbind(cbind(data[[i]], rep(info$mzMean[i], nrow(data[[i]]))), c(NA,NA,NA))})
+            data <- lapply(1:length(data), function(i) {rbind(data[[i]], c(NA,NA,NA))})
             data <- do.call(rbind, data)
             lines3d(x=data[,1], y=data[,3], z=data[,2])
             decorate3d(xlab='Retention time (sec)', ylab='m/z', zlab='Intensity', aspect=TRUE, box=FALSE, cex=3)
@@ -116,6 +196,57 @@ setMethod(
     }
 )
 
+#' Get scans from peak
+#' 
+setMethod(
+    'scans', 'MsPeakList',
+    function(object) {
+        info <- msInfo(object)
+        res <- list()
+        for(i in 1:length(object)) {
+            args$object <- con(object, i, 'MsData')
+            args$seqNum <- BETWEEN(info$scanStart[i], info$scanEnd[i])
+            args$msLevel <- info$msLevel[i]
+            res[[i]] <- do.call(scans, args)
+        }
+        res
+    }
+)
+
+#' Get chroms with optional expansion
+#' 
+setMethod(
+    'chroms', 'MsPeakList',
+    function(object, mzExpand=0, rtExpand=0) {
+        info <- msInfo(object)
+        res <- list()
+        for(i in 1:length(object)) {
+            args$object <- con(object, i, 'MsData')
+            args$retentionTime <- BETWEEN(min(object[[i]][, 'retentionTime'])-rtExpand, max(object[[i]][, 'retentionTime'])+rtExpand)
+            args$mz <- BETWEEN(info$mzMin[i]-mzExpand, info$mzMax[i]+mzExpand)
+            args$msLevel <- info$msLevel[i]
+            res[[i]] <- do.call(chroms, args)
+        }
+        do.call(c, res)
+    }
+)
+#' Get ions with optional expansion
+#' 
+setMethod(
+    'ions', 'MsPeakList',
+    function(object, mzExpand=0, rtExpand=0, ...) {
+        info <- msInfo(object)
+        res <- list()
+        for(i in 1:length(object)) {
+            args$object <- con(object, i, 'MsData')
+            args$retentionTime <- BETWEEN(min(object[[i]][, 'retentionTime'])-rtExpand, max(object[[i]][, 'retentionTime'])+rtExpand)
+            args$mz <- BETWEEN(info$mzMin[i]-mzExpand, info$mzMax[i]+mzExpand)
+            args$msLevel <- info$msLevel[i]
+            res[[i]] <- do.call(ions, args)
+        }
+        do.call(c, res)
+    }
+)
 
 #' @describeIn MsPeakList Get information about the scan
 #' 

@@ -48,7 +48,13 @@ setClass(
             return('Mapping must contain the columns \'start\', \'end\' and \'conIndex\' ')
         }
         return(TRUE)
-    }
+    },
+    prototype = list(
+        connections = list(),
+        info = data.frame(),
+        data = matrix(),
+        mapping = matrix(ncol=5, dimnames=list(NULL, c('start', 'end', 'conIndex', 'memberIndex', 'raw')))
+    )
 )
 
 ### METHODS

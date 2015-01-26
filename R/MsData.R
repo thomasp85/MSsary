@@ -128,7 +128,7 @@ setMethod(
     function(object, ..., raw=FALSE) {
         acqNum <- unlist(getAcqNum(con(object), ..., raw=raw))
         if(length(acqNum) == 0) {
-            stop('No scans match criteria')
+            return(new('MsScanList'))
         }
         scInfo <- con(object)$getHeader(acqNum, raw=raw)
         scData <- con(object)$getScans(acqNum, raw=raw)
@@ -153,6 +153,9 @@ setMethod(
     function(object, ..., mz, raw=FALSE) {
         args <- list(...)
         acqNum <- getContAcqNum(con(object), ..., raw=raw)
+        if(length(unlist(acqNum)) == 0) {
+            return(new('MsChromList'))
+        }
         msLevels <- toFilter(args$msLevel)$data
         msLevels <- rep(msLevels, length.out=length(acqNum))
         if(missing(mz)) {
@@ -171,6 +174,8 @@ setMethod(
             }
             data <- con(object)$extractIC(acqNum, mzFunc, raw=raw)
         }
+        msLevels <- toFilter(args$msLevel)$data
+        msLevels <- rep(msLevels, length.out=length(data))
         info <- lapply(1:length(data), function(i) {
             data.frame(
                 msLevel=msLevels[i],
@@ -203,6 +208,9 @@ setMethod(
     function(object, ..., mz, raw=FALSE) {
         args <- list(...)
         acqNum <- getContAcqNum(con(object), ..., raw=raw)
+        if(length(unlist(acqNum)) == 0) {
+            return(new('MsIonList'))
+        }
         msLevels <- toFilter(args$msLevel)$data
         msLevels <- rep(msLevels, length.out=length(acqNum))
         
@@ -244,6 +252,9 @@ setMethod(
     'peaks', 'MsData',
     function(object, ...) {
         ids <- unlist(getPeakIds(con(object), ...))
+        if(length(ids) == 0) {
+            return(new('MsPeakList'))
+        }
         info <- con(object)$getPeaks(ids)
         data <- lapply(info$peak, matrix, ncol=2, byrow=TRUE)
         info$peak <- NULL
@@ -305,7 +316,7 @@ setMethod(
         peaks <- do.call(peakMethods$useMethod, arguments)
         funcCall <- expand.call(call=sys.call(-1), expand.dots = TRUE)
         prevID <- dbGetQuery(con(object)$sary(), 'SELECT IFNULL(MAX(rowid), 0) AS max FROM peakInfo')$max
-        con(object)$addData('peakInfo', peaks[, c('msLevel', 'length', 'mzMean', 'maxHeight', 'area', 'peak')])
+        con(object)$addData('peakInfo', peaks[, c('msLevel', 'length', 'FWHM', 'mzMean', 'scanMax', 'maxHeight', 'area', 'peak')])
         ids <- dbGetQuery(con(object)$sary(), paste0('SELECT rowid AS id FROM peakInfo WHERE rowid > ', prevID))$id
         con(object)$addData('peakLoc', data.frame(peakID=ids, peaks[, c('scanStart', 'scanEnd', 'mzMin', 'mzMax')]))
         con(object)$addData(
