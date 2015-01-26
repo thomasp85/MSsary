@@ -18,12 +18,14 @@ struct feature {
     double mz;
     double mzmin;
     double mzmax;
-    int scmin;
+    int scstart;
+    int scend;
     int scmax;
     int length;
     double intensity;
     double maxint;
     std::vector<double> ions;
+    double fwhm;
 };
 
 class Tracker {
@@ -114,6 +116,8 @@ class Tracker {
         double getXbar();
 
         double getS2();
+        
+        double getFWHM(std::vector<double> peak);
 
         std::list<int> getScanList();
 

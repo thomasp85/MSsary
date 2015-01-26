@@ -152,6 +152,41 @@ double Tracker::getS2() {
     return mzS2;
 }
 
+double Tracker::getFWHM(std::vector<double> peak) {
+    double sToFWHM = 2.35482;
+    int nIter = 4;
+    std::vector<double> x(peak.size() / 2);
+    std::vector<double> y(peak.size() / 2);
+    double maxY = 0;
+    double maxX = 0;
+    for(size_t i = 0, j = 0; i < (peak.size() - 1); i+=2, j++){
+        x[j] = (peak[i]);
+        y[j] = (peak[i + 1]);
+        if(maxY < y[j]) {
+            maxY = y[j];
+            maxX = x[j];
+        }
+    }
+    double lowerS = 0;
+    double upperS = (x[x.size()-1] - x[0])/sToFWHM; //Expect FWHM to not be greater than peak width
+    double bestS;
+    for(int k = 0; k < nIter; k++) {
+        std::vector<double> possS(10);
+        std::vector<double> ssError(possS.size());
+        for(int j = 0; j < possS.size(); j++) {
+            possS[j] = lowerS + (upperS-lowerS)/10 * (j+1);
+            for(int i = 0; i < x.size(); i++) {
+                ssError[j] += pow(y[i] - maxY*exp( -( pow(x[i]-maxX, 2) ) / (2*possS[j]*possS[j]) ), 2);
+            }
+        }
+        int min_index = min_element(ssError.begin(), ssError.end()) - ssError.begin();
+        lowerS = min_index == 0 ? possS[min_index] : possS[min_index - 1];
+        upperS = min_index == (possS.size()-1) ? possS[min_index] : possS[min_index + 1];
+        bestS = possS[min_index];
+    }
+    return bestS*sToFWHM;
+}
+
 std::list<int> Tracker::getScanList() {
     return scanList;
 }
@@ -305,15 +340,16 @@ feature Tracker::getFeatureInfo(const std::vector<double> & scanTime) {
     //4-length
     featInfo.length = scanList.size();
     //5-scan min
-    featInfo.scmin  = double(*min_element(scanList.begin(), scanList.end()));
+    featInfo.scstart  = double(*min_element(scanList.begin(), scanList.end()));
     //featInfo[4]  = scanTime[*min_element(scanList.begin(), scanList.end())];
     //6-scan max
-    featInfo.scmax = double(*max_element(scanList.begin(), scanList.end()));
+    featInfo.scend = double(*max_element(scanList.begin(), scanList.end()));
     //featInfo[5] = scanTime[*max_element(scanList.begin(), scanList.end())];
     //7-integrated (not normalized intensity)
     
     double area = 0;
     double maxInten = 0;
+    int scanMax;
     /*note that sqrt transformation is one to one for values >= 0*/
     //Rprintf("\nIntensity Values\n");
     vector<double> peak; 
@@ -328,6 +364,7 @@ feature Tracker::getFeatureInfo(const std::vector<double> & scanTime) {
         double ion = *it_i;
         if (maxInten < ion) {
             maxInten = ion;
+            scanMax = *currentScan;
         }
         //Rprintf("%f\t", (*it_i)*(*it_i));
         double areaSlice = (lastHeight + ion)*(scanTime[(*currentScan) - 1] - lastTime)/2;
@@ -339,9 +376,11 @@ feature Tracker::getFeatureInfo(const std::vector<double> & scanTime) {
         peak.push_back(lastTime);
         peak.push_back(lastHeight);
     }
+    featInfo.scmax = scanMax;
     featInfo.intensity = area;
     featInfo.maxint = maxInten;
     featInfo.ions = peak;
+    featInfo.fwhm = getFWHM(peak);
 
    /*verify some of my findings*/
    /* Rprintf("\nThe Scan Times\n");
