@@ -15,10 +15,6 @@
 #include <Rcpp.h>
 
 
-#include <thread>         // std::this_thread::sleep_for
-#include <chrono>         // std::chrono::seconds
-
-
 using namespace Rcpp;
 
 using namespace std;
