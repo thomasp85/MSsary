@@ -50,7 +50,7 @@ void SegProc::groupSegments(TrMgr & busybody) {
         double perc  = (i/nPic) * 100;
         if (perc > progThresh) {
             progress[int(perc)/2] = '=';
-            Rcout << "\r" + header + " |" + progress + "| " + to_string(int(perc)) + "%  ";
+            Rcout << "\r" + header + " |" + progress + "| " + std::to_string(int(perc)) + "%  ";
             R_FlushConsole();
             R_ProcessEvents();
             progThresh += 1;
@@ -184,7 +184,7 @@ vector<int> SegProc::collapseGroups(TrMgr & busybody) {
         double perc  = (i/nGroups) * 100;
         if (perc > progThresh) {
             progress[int(perc)/2] = '=';
-            Rcout << "\r" + header + " |" + progress + "| " + to_string(int(perc)) + "%  ";
+            Rcout << "\r" + header + " |" + progress + "| " + std::to_string(int(perc)) + "%  ";
             R_FlushConsole();
             R_ProcessEvents();
             progThresh += 1;

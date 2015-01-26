@@ -62,7 +62,7 @@ List mqCpp(List scans, NumericVector scantime, double minIntensity,
         double perc  = (progCount/totalScanNums) * 100;
         if (perc > progThresh) {
             progress[int(perc)/2] = '=';
-            Rcout << "\r" + header + " |" + progress + "| " + to_string(int(perc)) + "%  ";
+            Rcout << "\r" + header + " |" + progress + "| " + std::to_string(int(perc)) + "%  ";
             R_FlushConsole();
             progThresh += 1;
         }
@@ -86,7 +86,7 @@ List mqCpp(List scans, NumericVector scantime, double minIntensity,
         sproc.groupSegments(busybody);
         sproc.splitToGroups();
         vector<int> stats = sproc.collapseGroups(busybody);
-        footer = footer + "\n" + to_string(stats[0]) + " features collapsed to " + to_string(stats[1]);
+        footer = footer + "\n" + std::to_string(stats[0]) + " features collapsed to " + std::to_string(stats[1]);
     }
     
     // Create return value stores
@@ -94,12 +94,14 @@ List mqCpp(List scans, NumericVector scantime, double minIntensity,
     NumericVector mzRes(nRes);
     NumericVector mzminRes(nRes);
     NumericVector mzmaxRes(nRes);
-    IntegerVector scminRes(nRes);
-    IntegerVector scmaxRes(nRes);
+    IntegerVector scstartRes(nRes);
+    IntegerVector scendRes(nRes);
     IntegerVector lengthRes(nRes);
     NumericVector intensityRes(nRes);
     NumericVector maxintRes(nRes);
+    NumericVector scmaxRes(nRes);
     List peak(nRes);
+    NumericVector fwhmRes(nRes);
     
     // Iterate over trackers and extract features
     for (int i=0;i<busybody.getPicCounts();i++) {
@@ -109,12 +111,14 @@ List mqCpp(List scans, NumericVector scantime, double minIntensity,
         mzminRes[i] = featInfo.mzmin;
         mzmaxRes[i] = featInfo.mzmax;
         lengthRes[i] = featInfo.length;
-        scminRes[i] = featInfo.scmin;
-        scmaxRes[i] = featInfo.scmax;
+        scstartRes[i] = featInfo.scstart;
+        scendRes[i] = featInfo.scend;
         intensityRes[i] = featInfo.intensity;
         maxintRes[i] = featInfo.maxint;
+        scmaxRes[i] = featInfo.scmax;
         peak[i] = NumericVector(featInfo.ions.begin(), featInfo.ions.end());
+        fwhmRes[i] = featInfo.fwhm;
     }
     Rcout << "\rDone              |" + string(50, '=') + "| 100%  " + footer << endl;
-    return List::create(Named("mzMean")=mzRes, Named("mzMin")=mzminRes, Named("mzMax")=mzmaxRes, Named("length")=lengthRes, Named("scanStart")=scminRes, Named("scanEnd")=scmaxRes, Named("area")=intensityRes, Named("maxHeight")=maxintRes, Named("peak")=peak);
+    return List::create(Named("mzMean")=mzRes, Named("mzMin")=mzminRes, Named("mzMax")=mzmaxRes, Named("length")=lengthRes, Named("FWHM")=fwhmRes, Named("scanStart")=scstartRes, Named("scanEnd")=scendRes, Named("scanMax")=scmaxRes, Named("area")=intensityRes, Named("maxHeight")=maxintRes, Named("peak")=peak);
 }
