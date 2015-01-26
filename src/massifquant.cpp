@@ -60,9 +60,11 @@ List mqCpp(List scans, NumericVector scantime, double minIntensity,
     for (int k = totalScanNums - 1; k >= 1; k--) {
         //progress
         double perc  = (progCount/totalScanNums) * 100;
+        char buffer[10];
         if (perc > progThresh) {
             progress[int(perc)/2] = '=';
-            Rcout << "\r" + header + " |" + progress + "| " + std::to_string(int(perc)) + "%  ";
+            sprintf(buffer, "%3d", int(perc));
+            Rcout << "\r" + header + " |" + progress + "| " + string(buffer) + "%  ";
             R_FlushConsole();
             progThresh += 1;
         }
@@ -86,7 +88,9 @@ List mqCpp(List scans, NumericVector scantime, double minIntensity,
         sproc.groupSegments(busybody);
         sproc.splitToGroups();
         vector<int> stats = sproc.collapseGroups(busybody);
-        footer = footer + "\n" + std::to_string(stats[0]) + " features collapsed to " + std::to_string(stats[1]);
+        char buffer[100];
+        sprintf(buffer, "\n%d features collapsed to %d", stats[0], stats[1]);
+        footer = footer + string(buffer);
     }
     
     // Create return value stores
